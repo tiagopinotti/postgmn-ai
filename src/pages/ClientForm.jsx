@@ -10,6 +10,7 @@ const DEFAULT_FORM = {
   whatsapp: '', gbp_url: '', website: '', instagram: '', address: '',
   description: '', target_audience: '', tone_of_voice: 'profissional e acessível',
   main_cta: '', content_goal: '', posts_per_week: 2, is_active: true,
+  whatsapp_group_link: '',
 }
 
 export default function ClientForm() {
@@ -225,6 +226,21 @@ export default function ClientForm() {
                   <div className="form-group">
                     <label className="form-label">Endereço</label>
                     <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, bairro" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    💬 Link do grupo WhatsApp
+                    <span style={{ color: 'var(--gray-400)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>para notificação de aprovação</span>
+                  </label>
+                  <input
+                    className="form-input"
+                    value={form.whatsapp_group_link}
+                    onChange={e => set('whatsapp_group_link', e.target.value)}
+                    placeholder="https://chat.whatsapp.com/XXXXXXXXXX"
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 4 }}>
+                    Abra o grupo no WhatsApp → ... → Convidar → Copiar link. O cliente verá um botão para avisar a equipe após aprovar os posts.
                   </div>
                 </div>
               </div>

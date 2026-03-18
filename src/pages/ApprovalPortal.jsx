@@ -31,6 +31,7 @@ export default function ApprovalPortal() {
   const [saving, setSaving] = useState(null)
   const [feedbacks, setFeedbacks] = useState({})
   const [allApproved, setAllApproved] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => { loadPortal() }, [token])
 
@@ -64,6 +65,41 @@ export default function ApprovalPortal() {
     setLoading(false)
   }
 
+  // Dispara webhook do Make.com silenciosamente
+  async function sendMakeWebhook(updatedPosts) {
+    const webhookUrl = import.meta.env.VITE_MAKE_WEBHOOK_URL
+    if (!webhookUrl) return
+    const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    const approvedPosts = updatedPosts.filter(p => p.status === 'aprovado' || p.status === 'approved')
+    const changedPosts  = updatedPosts.filter(p => p.status === 'change_requested')
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente: client?.company_name || '',
+          cidade: client?.city || '',
+          mes: plan?.month ? MONTHS_PT[plan.month - 1] : '',
+          ano: plan?.year || '',
+          total_posts: updatedPosts.length,
+          aprovados: approvedPosts.length,
+          alteracoes: changedPosts.length,
+          posts_aprovados: approvedPosts.map(p => ({
+            tema: p.theme,
+            data: p.scheduled_date || '',
+            texto: p.post_text || '',
+            categoria: p.category || '',
+          })),
+          posts_alteracao: changedPosts.map(p => ({
+            tema: p.theme,
+            observacao: p.client_feedback || '',
+          })),
+          timestamp: new Date().toISOString(),
+        })
+      })
+    } catch(e) { /* silencioso */ }
+  }
+
   async function approvePost(postId) {
     setSaving(postId)
     await supabase.from('posts').update({
@@ -76,9 +112,10 @@ export default function ApprovalPortal() {
     const updated = posts.map(p => p.id === postId ? { ...p, status: 'aprovado', approved_by_client: true } : p)
     setPosts(updated)
     setSaving(null)
-    // Verificar se todos aprovados
+    // Se todos aprovados: ativa banner e dispara webhook
     if (updated.every(p => p.status === 'aprovado' || p.status === 'approved')) {
       setAllApproved(true)
+      sendMakeWebhook(updated)
     }
   }
 
@@ -91,8 +128,11 @@ export default function ApprovalPortal() {
     await supabase.from('approvals').insert({
       post_id: postId, client_id: client.id, status: 'change_requested', comment: feedbacks[postId]
     })
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: 'change_requested' } : p))
+    const updated = posts.map(p => p.id === postId ? { ...p, status: 'change_requested' } : p)
+    setPosts(updated)
     setSaving(null)
+    // Notifica webhook quando há alteração solicitada
+    sendMakeWebhook(updated)
   }
 
   async function approveAll() {
@@ -104,30 +144,74 @@ export default function ApprovalPortal() {
         post_id: post.id, client_id: client.id, status: 'approved', approved_at: new Date().toISOString()
       })
     }
-    setPosts(prev => prev.map(p => ({ ...p, status: 'aprovado', approved_by_client: true })))
+    const allUpdated = posts.map(p => ({ ...p, status: 'aprovado', approved_by_client: true }))
+    setPosts(allUpdated)
     setAllApproved(true)
     setSaving(null)
+    sendMakeWebhook(allUpdated)
   }
 
   function buildGroupMessage() {
     const monthName = plan ? MONTHS[(plan.month || 1) - 1] + ' ' + plan.year : ''
-    const approvedList = posts
-      .filter(p => p.status === 'aprovado' || p.status === 'approved')
-      .map((p, i) => `${i + 1}. ${p.theme}`)
-      .join('\n')
-    return `✅ *Textos aprovados — ${client?.company_name}*\n\nPlano de ${monthName} aprovado!\n\n*Posts aprovados:*\n${approvedList}\n\n_Aprovado pelo portal PostGMN AI_`
+    const approvedPosts = posts.filter(p => p.status === 'aprovado' || p.status === 'approved')
+    const changedPosts  = posts.filter(p => p.status === 'change_requested')
+
+    let msg = `✅ *Textos aprovados — ${client?.company_name}*\n`
+    msg += `📅 Plano de ${monthName}\n`
+    msg += `━━━━━━━━━━━━━━━━━━\n\n`
+
+    if (approvedPosts.length > 0) {
+      msg += `*${approvedPosts.length} post(s) APROVADO(s):*\n\n`
+      approvedPosts.forEach((p, i) => {
+        const date = p.scheduled_date
+          ? new Date(p.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+          : ''
+        msg += `*${i + 1}. ${p.theme}*${date ? ` (${date})` : ''}\n`
+        if (p.post_text) {
+          msg += `${p.post_text}\n`
+        }
+        msg += '\n'
+      })
+    }
+
+    if (changedPosts.length > 0) {
+      msg += `━━━━━━━━━━━━━━━━━━\n`
+      msg += `*${changedPosts.length} post(s) com ALTERAÇÃO SOLICITADA:*\n\n`
+      changedPosts.forEach((p, i) => {
+        msg += `*${i + 1}. ${p.theme}*\n`
+        if (p.client_feedback) msg += `💬 Observação: "${p.client_feedback}"\n`
+        msg += '\n'
+      })
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━\n`
+    msg += `_Enviado pelo portal PostGMN AI_`
+    return msg
   }
 
   function openGroupWhatsApp() {
-    const msg = encodeURIComponent(buildGroupMessage())
+    const msg = buildGroupMessage()
+    // Copiar mensagem para clipboard
+    navigator.clipboard.writeText(msg).catch(() => {
+      // fallback: criar textarea temporário
+      const ta = document.createElement('textarea')
+      ta.value = msg
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    })
+    setCopied(true)
+    setTimeout(() => setCopied(false), 8000)
+    // Abrir o grupo após pequeno delay (dar tempo de copiar)
     const groupLink = client?.whatsapp_group_link
-    if (groupLink) {
-      // Link de grupo: https://chat.whatsapp.com/XXX — abre o grupo direto
-      window.open(groupLink, '_blank')
-    } else {
-      // Fallback: abre WA Web com mensagem (usuário seleciona o grupo)
-      window.open(`https://wa.me/?text=${msg}`, '_blank')
-    }
+    setTimeout(() => {
+      if (groupLink) {
+        window.open(groupLink, '_blank')
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+      }
+    }, 300)
   }
 
   if (loading) return (
@@ -167,6 +251,25 @@ export default function ApprovalPortal() {
       </div>
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
+
+        {/* BANNER MENSAGEM COPIADA */}
+        {copied && (
+          <div style={{
+            position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+            background: '#1a1a1a', color: 'white', borderRadius: 12,
+            padding: '14px 24px', zIndex: 9999, fontSize: 14, fontWeight: 500,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10,
+            maxWidth: '90vw', textAlign: 'center'
+          }}>
+            <span style={{ fontSize: 20 }}>📋</span>
+            <div>
+              <div style={{ fontWeight: 700 }}>Mensagem copiada!</div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
+                O WhatsApp vai abrir — cole a mensagem no grupo (pressione e segure → Colar)
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* BANNER TUDO APROVADO */}
         {(allDone || allApproved) && (

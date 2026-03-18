@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { callClaude, buildWhatsAppLink, extractJSON } from '../lib/ai.js'
+import ImageCreator from '../components/ImageCreator.jsx'
 
 function generateToken() {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
@@ -482,6 +483,9 @@ function PostViewer({ post, onEdit, onDelete, onGenerate, onStatusChange, genera
           </div>
         </>
       )}
+
+      {/* Gerador de Criativos */}
+      <ImageCreator post={post} client={client} />
     </div>
   )
 }

@@ -10,7 +10,14 @@ const IconBell = () => <svg width="18" height="18" fill="none" stroke="currentCo
 export default function Settings() {
   const { user } = useAuth()
   const [tab, setTab] = useState('profile')
-  const [profile, setProfile] = useState({ name: '', agency_name: '', phone: '', webhook_url: '' })
+  const [profile, setProfile] = useState({ 
+    name: '', 
+    agency_name: '', 
+    phone: '', 
+    webhook_url: '',
+    agency_logo_url: '',
+    agency_primary_color: '#4F46E5'
+  })
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -18,14 +25,39 @@ export default function Settings() {
   const [pwError, setPwError] = useState('')
   const [pwSaved, setPwSaved] = useState(false)
   const [pwSaving, setPwSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('users').select('name, agency_name, phone, webhook_url').eq('id', user.id).single()
-      if (data) setProfile({ name: data.name || '', agency_name: data.agency_name || '', phone: data.phone || '', webhook_url: data.webhook_url || '' })
+      const { data } = await supabase.from('users').select('name, agency_name, phone, webhook_url, agency_logo_url, agency_primary_color').eq('id', user.id).single()
+      if (data) setProfile({ 
+        name: data.name || '', 
+        agency_name: data.agency_name || '', 
+        phone: data.phone || '', 
+        webhook_url: data.webhook_url || '',
+        agency_logo_url: data.agency_logo_url || '',
+        agency_primary_color: data.agency_primary_color || '#4F46E5'
+      })
     }
     load()
   }, [user])
+
+  async function handleLogoUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingLogo(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const path = `agency/${user.id}-${Math.random()}.${fileExt}`
+      const { error: err } = await supabase.storage.from('template-assets').upload(path, file)
+      if (err) throw err
+      const { data: { publicUrl } } = supabase.storage.from('template-assets').getPublicUrl(path)
+      setProfile(p => ({ ...p, agency_logo_url: publicUrl }))
+    } catch (err) {
+      setError('Erro ao subir logo: ' + err.message)
+    }
+    setUploadingLogo(false)
+  }
 
   async function saveProfile(e) {
     e.preventDefault()
@@ -36,6 +68,8 @@ export default function Settings() {
       agency_name: profile.agency_name,
       phone: profile.phone,
       webhook_url: profile.webhook_url,
+      agency_logo_url: profile.agency_logo_url,
+      agency_primary_color: profile.agency_primary_color,
       updated_at: new Date().toISOString()
     }).eq('id', user.id)
     setSaving(false)
@@ -105,6 +139,35 @@ export default function Settings() {
                 <div className="form-group">
                   <label className="form-label">Nome da Agência</label>
                   <input className="form-input" value={profile.agency_name} onChange={e => setProfile(p => ({ ...p, agency_name: e.target.value }))} placeholder="Ex: Agência Digital X" />
+                </div>
+
+                <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--gray-100)', marginBottom: 24 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Identidade Visual da Agência</h4>
+                  <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Logo da Agência</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {profile.agency_logo_url ? (
+                          <div style={{ width: 48, height: 48, borderRadius: 8, border: '1px solid var(--gray-200)', overflow: 'hidden', background: 'white' }}>
+                            <img src={profile.agency_logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          </div>
+                        ) : (
+                          <div style={{ width: 48, height: 48, borderRadius: 8, background: 'var(--gray-50)', border: '1px dashed var(--gray-300)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🏢</div>
+                        )}
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => document.getElementById('logo-upload').click()} disabled={uploadingLogo}>
+                          {uploadingLogo ? 'Subindo...' : 'Alterar Logo'}
+                        </button>
+                        <input id="logo-upload" type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Cor Primária (Relatórios)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input type="color" className="form-input" style={{ width: 48, padding: 2, height: 38 }} value={profile.agency_primary_color} onChange={e => setProfile(p => ({ ...p, agency_primary_color: e.target.value }))} />
+                        <input type="text" className="form-input" style={{ flex: 1 }} value={profile.agency_primary_color} onChange={e => setProfile(p => ({ ...p, agency_primary_color: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Email (read-only) */}

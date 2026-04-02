@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { toast } from 'react-hot-toast'
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
@@ -79,6 +80,35 @@ export default function Reports() {
   const [screenshots, setScreenshots] = useState([])
   const [screenshotReport, setScreenshotReport] = useState('')
   const [screenshotLoading, setScreenshotLoading] = useState(false)
+  const [branding, setBranding] = useState({ logo: '', color: '#4F46E5', agency_name: '' })
+  const [zapMessage, setZapMessage] = useState('')
+  const [savedReportId, setSavedReportId] = useState(null)
+
+  useEffect(() => {
+    async function loadBranding() {
+      const { data } = await supabase.from('users').select('agency_logo_url, agency_primary_color, agency_name').eq('id', user.id).single()
+      if (data) setBranding({ logo: data.agency_logo_url || '', color: data.agency_primary_color || '#4F46E5', agency_name: data.agency_name || '' })
+    }
+    loadBranding()
+  }, [user])
+
+  useEffect(() => {
+    if (selectedClient !== 'all') loadSavedReport()
+    else { setAiReport(''); setZapMessage(''); setSavedReportId(null) }
+  }, [selectedClient, month, year])
+
+  async function loadSavedReport() {
+    const { data } = await supabase.from('reports_ai').select('id, report_text, zap_message').eq('client_id', selectedClient).eq('month', month).eq('year', year).maybeSingle()
+    if (data) {
+      setAiReport(data.report_text)
+      setZapMessage(data.zap_message || '')
+      setSavedReportId(data.id)
+    } else {
+      setAiReport('')
+      setZapMessage('')
+      setSavedReportId(null)
+    }
+  }
 
   useEffect(() => {
     async function loadClients() {
@@ -175,8 +205,14 @@ export default function Reports() {
   async function generateAiReport() {
     if (!gmbData?.connected) return
     setAiLoading(true)
+
+    // Buscar relatório do mês anterior para comparação
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevYear = month === 1 ? year - 1 : year
+    const { data: prevReport } = await supabase.from('reports_ai').select('report_text').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle()
+
     const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
-    const prompt = `Você é um estrategista de marketing digital especializado em Google Meu Negócio. Gere um relatório profissional mensal em português para o cliente "${clientName}" referente a ${MONTHS[month - 1]} ${year}.
+    let prompt = `Você é um estrategista de marketing digital especializado em Google Meu Negócio. Gere um relatório profissional mensal em português para o cliente "${clientName}" referente a ${MONTHS[month - 1]} ${year}.
 
 Dados reais do período:
 - Total de Interações: ${gmbData.total_interactions || 0}
@@ -186,42 +222,126 @@ Dados reais do período:
 - Mensagens: ${gmbData.conversations || 0}
 - Agendamentos: ${gmbData.bookings || 0}
 - Impressões na Busca: ${gmbData.impressions_search || 0}
-- Impressões no Maps: ${gmbData.impressions_maps || 0}
+- Impressões no Maps: ${gmbData.impressions_maps || 0}`
 
-Estruture assim:
-1. Resumo executivo do período (2-3 frases)
-2. Destaques positivos
-3. Pontos de atenção
-4. Próximos passos recomendados para o próximo mês
-5. Conclusão motivacional
+    if (prevReport) {
+      prompt += `\n\nO cenário do mês anterior (${MONTHS[prevMonth - 1]} ${prevYear}) foi: ${prevReport.report_text.substring(0, 1000)}. Compare os resultados atuais com os anteriores para destacar evolução ou declínio.`
+    }
 
-Seja direto, use números reais. Use parágrafos curtos. Não use markdown headers, apenas texto corrido com parágrafos e emojis para visual.`
+    prompt += `\n\nRetorne EXCLUSIVAMENTE um JSON no seguinte formato:
+{
+  "report": "Texto completo do relatório (Resumo, Destaques, Atenção, Próximos os, Conclusão). Use parágrafos e emojis.",
+  "zap": "Mensagem curta para o WhatsApp apresentando o relatório em anexo."
+}
+
+Não use headers markdown.`
 
     try {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY
+      let content = ''
       if (import.meta.env.VITE_OPENAI_API_KEY) {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 1500 })
+          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 1500, response_format: { type: 'json_object' } })
         })
         const data = await res.json()
-        setAiReport(data.choices?.[0]?.message?.content || 'Erro ao gerar relatório.')
+        content = data.choices?.[0]?.message?.content
       } else if (import.meta.env.VITE_GEMINI_API_KEY) {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
         })
         const data = await res.json()
-        setAiReport(data.candidates?.[0]?.content?.parts?.[0]?.text || 'Erro ao gerar relatório.')
-      } else {
-        setAiReport('Configure VITE_OPENAI_API_KEY ou VITE_GEMINI_API_KEY no .env para gerar relatórios com IA.')
+        content = data.candidates?.[0]?.content?.parts?.[0]?.text
+      }
+
+      if (content) {
+        const parsed = JSON.parse(content)
+        setAiReport(parsed.report)
+        setZapMessage(parsed.zap)
+
+        await supabase.from('reports_ai').upsert({
+          client_id: selectedClient,
+          month,
+          year,
+          report_text: parsed.report,
+          zap_message: parsed.zap,
+          user_id: user.id
+        })
       }
     } catch (e) {
-      setAiReport('Erro: ' + e.message)
+      console.error('AI Report error:', e)
+      setAiReport('Erro ao gerar: ' + e.message)
     }
     setAiLoading(false)
+  }
+
+  async function exportPDF() {
+    if (!aiReport) return
+    const element = document.createElement('div')
+    element.style.padding = '40px'
+    element.style.fontFamily = 'Inter, system-ui, sans-serif'
+    element.style.color = '#1f2937'
+    element.style.background = 'white'
+
+    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+
+    element.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid ${branding.color}; padding-bottom: 20px;">
+        <div>
+          ${branding.logo ? `<img src="${branding.logo}" style="height: 50px; width: auto; margin-bottom: 10px;" />` : `<h1 style="margin: 0; color: ${branding.color};">${branding.agency_name || 'Agência'}</h1>`}
+        </div>
+        <div style="text-align: right;">
+          <h2 style="margin: 0; font-size: 18px; color: ${branding.color};">Relatório Mensal de Performance</h2>
+          <p style="margin: 5px 0 0; color: #6b7280; font-size: 14px;">${MONTHS[month - 1]} ${year}</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 30px;">
+        <h3 style="font-size: 16px; margin-bottom: 10px; color: ${branding.color};">Resumo do Cliente</h3>
+        <p style="margin: 0; font-size: 14px;"><strong>Cliente:</strong> ${clientName}</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 40px;">
+        ${[
+    { label: 'Interações', value: gmbData?.total_interactions || 0 },
+    { label: 'Visitas ao Site', value: gmbData?.website_clicks || 0 },
+    { label: 'Chamadas', value: gmbData?.call_clicks || 0 },
+    { label: 'Rotas', value: gmbData?.direction_requests || 0 },
+    { label: 'Busca GMB', value: (gmbData?.impressions_search || 0).toLocaleString() },
+    { label: 'Maps GMB', value: (gmbData?.impressions_maps || 0).toLocaleString() }
+  ].map(s => `
+          <div style="padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; margin-bottom: 5px;">${s.label}</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${branding.color};">${s.value}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="line-height: 1.6; font-size: 14px; white-space: pre-wrap;">
+        ${aiReport}
+      </div>
+
+      <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
+        Relatório gerado por ${branding.agency_name || 'Agência'} via PostGMN AI.
+      </div>
+    `
+
+    const opt = {
+      margin: 10,
+      filename: `Relatorio-${clientName.replace(/\s+/g, '-')}-${MONTHS[month - 1]}-${year}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+
+    if (window.html2pdf) {
+      window.html2pdf().set(opt).from(element).save()
+    } else {
+      toast.error('Aguarde o carregamento do gerador de PDF...')
+    }
   }
 
   function handleScreenshots(files) {
@@ -471,12 +591,37 @@ Seja direto, use números reais. Use parágrafos curtos. Não use markdown heade
                         </button>
                       </div>
                       {aiReport && (
-                        <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
-                          {aiReport}
-                          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => {
-                              navigator.clipboard.writeText(aiReport)
-                            }}>Copiar texto</button>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginTop: 16 }}>
+                          <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
+                              <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>Análise Estratégica ✨</span>
+                              <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <IconDownload /> Baixar PDF Profissional
+                              </button>
+                            </div>
+                            {aiReport}
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div style={{ background: '#F0F9FF', borderRadius: 8, padding: 16, border: '1px solid #B9E6FE' }}>
+                              <h5 style={{ fontSize: 13, fontWeight: 700, color: '#0369A1', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                📱 Mensagem para WhatsApp
+                              </h5>
+                              <p style={{ fontSize: 13, color: '#0C4A6E', lineHeight: 1.5, marginBottom: 12 }}>{zapMessage || 'Gerando mensagem...'}</p>
+                              <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => {
+                                navigator.clipboard.writeText(zapMessage)
+                                toast.success('Copiada para o WhatsApp!')
+                              }}>Copiar para o Zap</button>
+                            </div>
+
+                            <div style={{ background: 'var(--gray-100)', borderRadius: 8, padding: 16, border: '1px solid var(--gray-200)' }}>
+                              <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 500 }}>Branding:</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                                <div style={{ width: 30, height: 30, borderRadius: 6, background: branding.color || '#4F46E5' }} title="Cor da Agência" />
+                                {branding.logo && <img src={branding.logo} style={{ height: 30, maxWidth: 60, objectFit: 'contain' }} alt="Logo Agência" />}
+                                <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{branding.agency_name}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}

@@ -119,6 +119,7 @@ export default function Calendar() {
               return (
                 <div key={i} style={{
                   minHeight: 90,
+                  minWidth: 0,
                   padding: '6px',
                   borderRight: i % 7 !== 6 ? '1px solid var(--gray-100)' : 'none',
                   borderBottom: '1px solid var(--gray-100)',

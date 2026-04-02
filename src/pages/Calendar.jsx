@@ -30,8 +30,9 @@ export default function Calendar() {
   async function loadData() {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth() + 1
+    const lastDay = new Date(year, month, 0).getDate()
     const start = `${year}-${String(month).padStart(2,'0')}-01`
-    const end = `${year}-${String(month).padStart(2,'0')}-31`
+    const end = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
 
     const { data: clientsData } = await supabase.from('clients').select('id, company_name').eq('user_id', user.id)
     setClients(clientsData || [])

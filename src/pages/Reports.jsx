@@ -270,9 +270,11 @@ Não use headers markdown.`
           zap_message: parsed.zap,
           user_id: user.id
         })
+        toast.success('Relatório gerado e salvo com sucesso!')
       }
     } catch (e) {
       console.error('AI Report error:', e)
+      toast.error('Erro ao gerar relatório: ' + e.message)
       setAiReport('Erro ao gerar: ' + e.message)
     }
     setAiLoading(false)
@@ -359,22 +361,65 @@ Não use headers markdown.`
   async function generateScreenshotReport() {
     if (!screenshots.length) return
     setScreenshotLoading(true)
-    const clientName = selectedClient !== 'all' ? clients.find(c => c.id === selectedClient)?.company_name : ''
+    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+    
+    // Add same prompt logic for JSON output
+    const prompt = `Você é um estrategista de marketing digital. Analise as imagens de desempenho do Google Meu Negócio anexadas para o cliente "${clientName}".
+Gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
+
+Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
+{
+  "report": "Texto completo do relatório com Resumo, Destaques, Pontos de Atenção e Sugestões. Use emojis e parágrafos.",
+  "zap": "Mensagem curta para WhatsApp apresentando o relatório."
+}
+Não use markdown headers.`
+
     try {
-      const res = await fetch('https://ubcwcmtdgcmbqghlpuds.supabase.co/functions/v1/gmb-report', {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      if (!apiKey) throw new Error('VITE_GEMINI_API_KEY não configurada')
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: screenshots,
-          client_name: clientName || 'Cliente',
-          month: MONTHS[month - 1],
-          year
+          contents: [{
+            parts: [
+              { text: prompt },
+              ...screenshots.map(img => ({
+                inline_data: { 
+                  mime_type: "image/jpeg", 
+                  data: img.split(',')[1] 
+                }
+              }))
+            ]
+          }],
+          generationConfig: { responseMimeType: "application/json" }
         })
       })
+      
       const data = await res.json()
-      setScreenshotReport(data.report || data.error || 'Erro ao gerar relatório.')
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+      
+      if (content) {
+        const parsed = JSON.parse(content)
+        setScreenshotReport(parsed.report)
+        setZapMessage(parsed.zap) // Shared state
+        setAiReport(parsed.report) // Unify to allow PDF export easily
+
+        // Save to DB
+        await supabase.from('reports_ai').upsert({
+          client_id: selectedClient,
+          month,
+          year,
+          report_text: parsed.report,
+          zap_message: parsed.zap,
+          user_id: user.id
+        })
+        toast.success('Relatório gerado e salvo!')
+      }
     } catch (e) {
-      setScreenshotReport('Erro: ' + e.message)
+      console.error('Screenshot AI error:', e)
+      toast.error('Erro ao analisar imagens: ' + e.message)
     }
     setScreenshotLoading(false)
   }
@@ -688,11 +733,30 @@ Não use headers markdown.`
                   {screenshotLoading ? (<><span className="spinner" style={{ width: 14, height: 14 }} /> Analisando imagens...</>) : '✨ Gerar Relatório a partir dos Prints'}
                 </button>
                 {screenshotReport && (
-                  <div style={{ marginTop: 20, background: 'white', borderRadius: 10, padding: '20px 24px', fontSize: 14, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                    {screenshotReport}
-                    <div style={{ marginTop: 16, display: 'flex', gap: 8, borderTop: '1px solid var(--gray-100)', paddingTop: 12 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(screenshotReport)}>📋 Copiar</button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setScreenshotReport(''); setScreenshots([]) }}>🗑️ Limpar</button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginTop: 16 }}>
+                    <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>Análise Visual Estratégica ✨</span>
+                        <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <IconDownload /> Baixar PDF Profissional
+                        </button>
+                      </div>
+                      {screenshotReport}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ background: '#F0F9FF', borderRadius: 8, padding: 16, border: '1px solid #B9E6FE' }}>
+                        <h5 style={{ fontSize: 13, fontWeight: 700, color: '#0369A1', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          📱 Para enviar no WhatsApp
+                        </h5>
+                        <p style={{ fontSize: 13, color: '#0C4A6E', lineHeight: 1.5, marginBottom: 12 }}>{zapMessage || 'Gerando mensagem...'}</p>
+                        <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => {
+                          navigator.clipboard.writeText(zapMessage)
+                          toast.success('Copiada para o WhatsApp!')
+                        }}>Copiar para o Zap</button>
+                      </div>
+
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setScreenshotReport(''); setScreenshots([]); setAiReport(''); setZapMessage('') }}>🗑️ Limpar Tudo</button>
                     </div>
                   </div>
                 )}

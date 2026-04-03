@@ -388,53 +388,95 @@ Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
 Não use markdown headers.`
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      if (!apiKey || apiKey.length < 10) throw new Error('VITE_GEMINI_API_KEY não configurada corretamente no .env')
+      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const openaiKey = import.meta.env.VITE_OPENAI_API_KEY
+      
+      let reportData = null
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              ...screenshots.map(img => ({
-                inline_data: { 
-                  mime_type: "image/jpeg", 
-                  data: img.split(',')[1] 
-                }
-              }))
-            ]
-          }],
-          generationConfig: { responseMimeType: "application/json" }
+      // Try Gemini first if key exists
+      if (geminiKey && geminiKey.length > 10) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  ...screenshots.map(img => ({
+                    inline_data: { 
+                      mime_type: "image/jpeg", 
+                      data: img.split(',')[1] 
+                    }
+                  }))
+                ]
+              }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          })
+          const data = await res.json()
+          if (res.ok) {
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+            if (content) reportData = JSON.parse(content.replace(/```json|```/g, '').trim())
+          }
+        } catch (err) {
+          console.error("Gemini Vision failed, falling back to OpenAI if possible", err)
+        }
+      }
+
+      // Fallback to OpenAI Vision if Gemini failed or key missing
+      if (!reportData && openaiKey && openaiKey.length > 10) {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  ...screenshots.map(img => ({
+                    type: "image_url",
+                    image_url: { url: img }
+                  }))
+                ]
+              }
+            ],
+            response_format: { type: "json_object" }
+          })
         })
-      })
-      
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text
-      
-      if (content) {
-        const cleanJson = content.replace(/```json|```/g, '').trim()
-        const parsed = JSON.parse(cleanJson)
-        setScreenshotReport(parsed.report)
-        setZapMessage(parsed.zap) // Shared state
-        setAiReport(parsed.report) // Unify to allow PDF export easily
+        const data = await res.json()
+        if (res.ok) {
+          const content = data.choices?.[0]?.message?.content
+          if (content) reportData = JSON.parse(content.trim())
+        } else {
+          throw new Error(data.error?.message || 'Erro na API da OpenAI')
+        }
+      }
+
+      if (reportData) {
+        setScreenshotReport(reportData.report)
+        setZapMessage(reportData.zap)
+        setAiReport(reportData.report)
 
         // Save to DB
         const { error: saveError } = await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
           year,
-          report_text: parsed.report,
-          zap_message: parsed.zap,
+          report_text: reportData.report,
+          zap_message: reportData.zap,
           user_id: user.id
         }, { onConflict: 'client_id,month,year' })
 
         if (saveError) throw new Error('Erro ao salvar no banco: ' + saveError.message)
         toast.success('Relatório gerado e salvo!')
       } else {
-        throw new Error('A IA não retornou um conteúdo válido das imagens.')
+        throw new Error('Não foi possível gerar o relatório. Verifique suas chaves de API (Gemini ou OpenAI) no arquivo .env.')
       }
     } catch (e) {
       console.error('Screenshot AI error:', e)

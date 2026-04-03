@@ -13,20 +13,12 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
   const canvasRef = useRef(null)
   const previewRef = useRef(null)
 
-  // Use DB templates if available, fallback to legacy service-based templates
+  // Use DB templates if available
   const dynamicTemplates = dbTemplates.length > 0
     ? dbTemplates.map(t => ({ id: t.id, ...t, label: t.name }))
-    : services.length > 0
-      ? services.map((s, i) => {
-          const name = (s.name || '').toLowerCase()
-          let base = TEMPLATES.ingles
-          if (name.includes('matem')) base = TEMPLATES.matematica
-          else if (name.includes('portug')) base = TEMPLATES.portugues
-          return { id: `service_${s.id || i}`, ...base, label: s.name }
-        })
-      : Object.entries(TEMPLATES).map(([k, t]) => ({ id: k, ...t }))
+    : [] // Every client starts empty, created from Visual Guide
 
-  const [selectedTemplate, setSelectedTemplate] = useState(dynamicTemplates[0]?.id || 'ingles')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
   const [imageText, setImageText] = useState('')
   const [localImage, setLocalImage] = useState(null)
   const [photoPrompt, setPhotoPrompt] = useState('')
@@ -37,13 +29,15 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
   const [savingDB, setSavingDB] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
 
-  const tpl = dynamicTemplates.find(t => t.id === selectedTemplate) || dynamicTemplates[0] || TEMPLATES.ingles
+  const tpl = dynamicTemplates.find(t => t.id === selectedTemplate) || dynamicTemplates[0] || null
 
   useEffect(() => {
-    setSelectedTemplate(post?.image_template || dynamicTemplates[0]?.id || 'ingles')
+    const defaultTpl = post?.image_template || dynamicTemplates[0]?.id || ''
+    setSelectedTemplate(defaultTpl)
     setImageText(post?.image_text || '')
     setLocalImage(post?.image_url || null)
-  }, [post?.id, dbTemplates.length, services.length])
+  }, [post?.id, dbTemplates.length])
+
 
   // Render canvas when template, text or image change
   useEffect(() => {
@@ -202,25 +196,36 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
         {/* Template selection */}
         <div className="form-group">
           <label className="form-label">Template</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {dynamicTemplates.map((t) => {
-              const key = t.id;
-              return (
-              <button key={key}
-                onClick={() => { setSelectedTemplate(key); setRendered(false) }}
-                style={{
-                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '2px solid',
-                  borderColor: selectedTemplate === key ? 'var(--primary)' : 'var(--gray-200)',
-                  background: selectedTemplate === key ? 'var(--primary-light)' : 'white',
-                  color: selectedTemplate === key ? 'var(--primary)' : 'var(--gray-600)',
-                  transition: 'all 0.15s',
-                  display: 'flex', alignItems: 'center', gap: 6
-                }}>
-                {t.bg_color && <span style={{ width: 12, height: 12, borderRadius: 3, background: t.bg_color, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />}
-                {t.label || t.name}
-              </button>
-            )})}
-          </div>
+          {dynamicTemplates.length > 0 ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {dynamicTemplates.map((t) => {
+                const key = t.id;
+                return (
+                <button key={key}
+                  onClick={() => { setSelectedTemplate(key); setRendered(false) }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '2px solid',
+                    borderColor: selectedTemplate === key ? 'var(--primary)' : 'var(--gray-200)',
+                    background: selectedTemplate === key ? 'var(--primary-light)' : 'white',
+                    color: selectedTemplate === key ? 'var(--primary)' : 'var(--gray-600)',
+                    transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}>
+                  {t.bg_color && <span style={{ width: 12, height: 12, borderRadius: 3, background: t.bg_color, border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0 }} />}
+                  {t.label || t.name}
+                </button>
+              )})}
+            </div>
+          ) : (
+            <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px dashed #EF4444', borderRadius: 8, color: '#991B1B', fontSize: 12 }}>
+              ⚠️ Nenhuma template artística encontrada. 
+              <br />
+              <a href={`/clientes/${client?.id}`} style={{ fontWeight: 700, color: '#EF4444', textDecoration: 'underline' }}>
+                Clique aqui para criar templates no Guia Visual do Cliente
+              </a>
+            </div>
+          )}
+
         </div>
 
         {/* Text input */}

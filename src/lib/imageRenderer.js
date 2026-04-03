@@ -6,30 +6,9 @@ const DEFAULT_LAYOUT = {
   logo: { x: 440, y: 900, maxW: 200, maxH: 120 },
 }
 
-// Legacy hardcoded templates (fallback for old data)
-export const TEMPLATES = {
-  ingles: {
-    label: 'Curso de Inglês',
-    file: '/templates/template-ingles.png',
-    box: { x: 92, y: 305, w: 440, h: 112 },
-    textColor: '#7B1D1D',
-    bgColor: '#FFFFFF',
-  },
-  matematica: {
-    label: 'Curso de Matemática',
-    file: '/templates/template-matematica.png',
-    box: { x: 92, y: 367, w: 440, h: 115 },
-    textColor: '#003380',
-    bgColor: '#FFFFFF',
-  },
-  portugues: {
-    label: 'Curso de Português',
-    file: '/templates/template-portugues.png',
-    box: { x: 90, y: 300, w: 445, h: 100 },
-    textColor: '#1a4a2e',
-    bgColor: '#FFFFFF',
-  },
-}
+// Legacy hardcoded templates (removed to ensure clean start for new clients)
+export const TEMPLATES = {}
+
 
 // Helper: load image as promise
 function loadImage(src) {

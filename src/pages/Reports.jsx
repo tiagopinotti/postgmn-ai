@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { toast } from 'react-hot-toast'
+import { buildWhatsAppLink } from '../lib/ai'
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
@@ -112,7 +113,7 @@ export default function Reports() {
 
   useEffect(() => {
     async function loadClients() {
-      const { data } = await supabase.from('clients').select('id, company_name, niche').eq('user_id', user.id).order('company_name')
+      const { data } = await supabase.from('clients').select('id, company_name, niche, whatsapp, contact_name').eq('user_id', user.id).order('company_name')
       setClients(data || [])
     }
     loadClients()
@@ -121,7 +122,7 @@ export default function Reports() {
   useEffect(() => {
     async function loadReport() {
       setLoading(true)
-      const { data: myClients } = await supabase.from('clients').select('id, company_name, niche').eq('user_id', user.id)
+      const { data: myClients } = await supabase.from('clients').select('id, company_name, niche, whatsapp, contact_name').eq('user_id', user.id)
       if (!myClients?.length) { setLoading(false); return }
 
       const targetClients = selectedClient === 'all' ? myClients : myClients.filter(c => c.id === selectedClient)
@@ -211,8 +212,12 @@ export default function Reports() {
     const prevYear = month === 1 ? year - 1 : year
     const { data: prevReport } = await supabase.from('reports_ai').select('report_text').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle()
 
-    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+    const client = clients.find(c => c.id === selectedClient)
+    const clientName = client?.company_name || 'Cliente'
+    const contactName = client?.contact_name || ''
+
     let prompt = `Você é um estrategista de marketing digital especializado em Google Meu Negócio. Gere um relatório profissional mensal em português para o cliente "${clientName}" referente a ${MONTHS[month - 1]} ${year}.
+${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do WhatsApp.` : ''}
 
 Dados reais do período:
 - Total de Interações: ${gmbData.total_interactions || 0}
@@ -230,15 +235,14 @@ Dados reais do período:
 
     prompt += `\n\nRetorne EXCLUSIVAMENTE um JSON no seguinte formato:
 {
-  "report": "Texto completo do relatório (Resumo, Destaques, Atenção, Próximos os, Conclusão). Use parágrafos e emojis.",
-  "zap": "Mensagem curta para o WhatsApp apresentando o relatório em anexo."
+  "report": "Texto completo do relatório (Resumo, Destaques, Atenção, Próximos Passos, Conclusão). Use parágrafos e emojis.",
+  "zap": "Mensagem curta para o WhatsApp apresentando o relatório em anexo. Comece com 'Olá ${contactName || 'tudo bem'},' se apropriado."
 }
-
-Não use headers markdown.`
+Não use markdown headers.`
 
     try {
-      const openAIKey = import.meta.env.VITE_OPENAI_API_KEY
-      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
+      const openAIKey = localStorage.getItem('API_KEY_OPENAI') || import.meta.env.VITE_OPENAI_KEY
+      const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
       let content = ''
 
       if (openAIKey && openAIKey.length > 10) {
@@ -260,7 +264,7 @@ Não use headers markdown.`
         if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
         content = data.candidates?.[0]?.content?.parts?.[0]?.text
       } else {
-        throw new Error('Nenhuma chave de API (OpenAI ou Gemini) configurada corretamente.')
+        throw new Error('Nenhuma chave de API (OpenAI ou Gemini/Google) configurada corretamente.')
       }
 
       if (content) {
@@ -295,13 +299,18 @@ Não use headers markdown.`
 
   async function exportPDF() {
     if (!aiReport) return
+    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+
     const element = document.createElement('div')
+    element.id = 'temp-pdf-export'
     element.style.padding = '40px'
     element.style.fontFamily = 'Inter, system-ui, sans-serif'
     element.style.color = '#1f2937'
     element.style.background = 'white'
-
-    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+    element.style.position = 'fixed'
+    element.style.left = '-10000px'
+    element.style.top = '0'
+    element.style.width = '800px' // Fix width for better layout consistency
 
     element.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid ${branding.color}; padding-bottom: 20px;">
@@ -344,17 +353,22 @@ Não use headers markdown.`
       </div>
     `
 
+    document.body.appendChild(element)
+
     const opt = {
       margin: 10,
       filename: `Relatorio-${clientName.replace(/\s+/g, '-')}-${MONTHS[month - 1]}-${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
+      html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }
 
     if (window.html2pdf) {
-      window.html2pdf().set(opt).from(element).save()
+      window.html2pdf().set(opt).from(element).save().then(() => {
+        document.body.removeChild(element)
+      })
     } else {
+      document.body.removeChild(element)
       toast.error('Aguarde o carregamento do gerador de PDF...')
     }
   }
@@ -375,17 +389,27 @@ Não use headers markdown.`
     if (!screenshots.length) return
     console.log("Starting screenshot report generation with", screenshots.length, "images")
     setScreenshotLoading(true)
-    const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+    const client = clients.find(c => c.id === selectedClient)
+    const clientName = client?.company_name || 'Cliente'
+    const contactName = client?.contact_name || ''
     
     // Prompt adapted for better JSON consistency
     const prompt = `Você é um estrategista de marketing digital especialista em Google Meu Negócio. 
-Analise as imagens de desempenho anexadas para o cliente "${clientName}".
+Analise os dados de desempenho para o cliente "${clientName}":
+- Interações: ${gmbData?.total_interactions || 0}
+- Visitas ao Site: ${gmbData?.website_clicks || 0}
+- Chamadas: ${gmbData?.call_clicks || 0}
+- Rotas: ${gmbData?.direction_requests || 0}
+- Busca GMB: ${gmbData?.impressions_search || 0}
+- Maps GMB: ${gmbData?.impressions_maps || 0}
+
 Gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
+${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do WhatsApp.` : ''}
 
 Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
 {
   "report": "Texto completo do relatório com Resumo, Destaques, Pontos de Atenção e Sugestões. Use emojis e parágrafos.",
-  "zap": "Mensagem curta para WhatsApp apresentando o relatório."
+  "zap": "Mensagem curta para WhatsApp apresentando o relatório. Comece com 'Olá ${contactName || 'tudo bem'},' se apropriado."
 }
 Não use markdown headers nem texto fora do JSON.`
 
@@ -731,10 +755,21 @@ Não use markdown headers nem texto fora do JSON.`
                                 📱 Mensagem para WhatsApp
                               </h5>
                               <p style={{ fontSize: 13, color: '#0C4A6E', lineHeight: 1.5, marginBottom: 12 }}>{zapMessage || 'Gerando mensagem...'}</p>
-                              <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => {
-                                navigator.clipboard.writeText(zapMessage)
-                                toast.success('Copiada para o WhatsApp!')
-                              }}>Copiar para o Zap</button>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={() => {
+                                  const client = clients.find(c => c.id === selectedClient)
+                                  if (client?.whatsapp) {
+                                    window.open(buildWhatsAppLink(client.whatsapp, zapMessage), '_blank')
+                                    toast.success('Abrindo WhatsApp...')
+                                  } else {
+                                    toast.error('Número de WhatsApp não cadastrado para este cliente.')
+                                  }
+                                }}>Enviar no WhatsApp</button>
+                                <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => {
+                                  navigator.clipboard.writeText(zapMessage)
+                                  toast.success('Copiada!')
+                                }}>Copiar</button>
+                              </div>
                             </div>
 
                             <div style={{ background: 'var(--gray-100)', borderRadius: 8, padding: 16, border: '1px solid var(--gray-200)' }}>
@@ -828,10 +863,21 @@ Não use markdown headers nem texto fora do JSON.`
                           📱 Para enviar no WhatsApp
                         </h5>
                         <p style={{ fontSize: 13, color: '#0C4A6E', lineHeight: 1.5, marginBottom: 12 }}>{zapMessage || 'Gerando mensagem...'}</p>
-                        <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => {
-                          navigator.clipboard.writeText(zapMessage)
-                          toast.success('Copiada para o WhatsApp!')
-                        }}>Copiar para o Zap</button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={() => {
+                            const client = clients.find(c => c.id === selectedClient)
+                            if (client?.whatsapp) {
+                              window.open(buildWhatsAppLink(client.whatsapp, zapMessage), '_blank')
+                              toast.success('Abrindo WhatsApp...')
+                            } else {
+                              toast.error('Número de WhatsApp não cadastrado para este cliente.')
+                            }
+                          }}>Enviar no WhatsApp</button>
+                          <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => {
+                            navigator.clipboard.writeText(zapMessage)
+                            toast.success('Copiada!')
+                          }}>Copiar</button>
+                        </div>
                       </div>
 
                       <button className="btn btn-ghost btn-sm" onClick={() => { setScreenshotReport(''); setScreenshots([]); setAiReport(''); setZapMessage('') }}>🗑️ Limpar Tudo</button>

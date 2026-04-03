@@ -237,47 +237,60 @@ Dados reais do período:
 Não use headers markdown.`
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY
+      const openAIKey = import.meta.env.VITE_OPENAI_API_KEY
+      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
       let content = ''
-      if (import.meta.env.VITE_OPENAI_API_KEY) {
+
+      if (openAIKey && openAIKey.length > 10) {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openAIKey}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 1500, response_format: { type: 'json_object' } })
         })
         const data = await res.json()
+        if (!res.ok) throw new Error(data.error?.message || 'Erro na API da OpenAI')
         content = data.choices?.[0]?.message?.content
-      } else if (import.meta.env.VITE_GEMINI_API_KEY) {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      } else if (geminiKey && geminiKey.length > 10) {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
         })
         const data = await res.json()
+        if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
         content = data.candidates?.[0]?.content?.parts?.[0]?.text
+      } else {
+        throw new Error('Nenhuma chave de API (OpenAI ou Gemini) configurada corretamente.')
       }
 
       if (content) {
-        const parsed = JSON.parse(content)
+        // Limpar possíveis marcações de markdown se a IA ignorar a instrução JSON pura
+        const cleanJson = content.replace(/```json|```/g, '').trim()
+        const parsed = JSON.parse(cleanJson)
         setAiReport(parsed.report)
         setZapMessage(parsed.zap)
 
-        await supabase.from('reports_ai').upsert({
+        const { error: saveError } = await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
           year,
           report_text: parsed.report,
           zap_message: parsed.zap,
           user_id: user.id
-        })
+        }, { onConflict: 'client_id,month,year' })
+
+        if (saveError) throw new Error('Erro ao salvar no banco: ' + saveError.message)
         toast.success('Relatório gerado e salvo com sucesso!')
+      } else {
+        throw new Error('A IA não retornou conteúdo. Verifique sua chave API.')
       }
     } catch (e) {
       console.error('AI Report error:', e)
       toast.error('Erro ao gerar relatório: ' + e.message)
-      setAiReport('Erro ao gerar: ' + e.message)
+      setAiReport('Erro ao gerar relatório: ' + e.message)
+    } finally {
+      setAiLoading(false)
     }
-    setAiLoading(false)
   }
 
   async function exportPDF() {
@@ -376,7 +389,7 @@ Não use markdown headers.`
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      if (!apiKey) throw new Error('VITE_GEMINI_API_KEY não configurada')
+      if (!apiKey || apiKey.length < 10) throw new Error('VITE_GEMINI_API_KEY não configurada corretamente no .env')
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -398,30 +411,37 @@ Não use markdown headers.`
       })
       
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text
       
       if (content) {
-        const parsed = JSON.parse(content)
+        const cleanJson = content.replace(/```json|```/g, '').trim()
+        const parsed = JSON.parse(cleanJson)
         setScreenshotReport(parsed.report)
         setZapMessage(parsed.zap) // Shared state
         setAiReport(parsed.report) // Unify to allow PDF export easily
 
         // Save to DB
-        await supabase.from('reports_ai').upsert({
+        const { error: saveError } = await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
           year,
           report_text: parsed.report,
           zap_message: parsed.zap,
           user_id: user.id
-        })
+        }, { onConflict: 'client_id,month,year' })
+
+        if (saveError) throw new Error('Erro ao salvar no banco: ' + saveError.message)
         toast.success('Relatório gerado e salvo!')
+      } else {
+        throw new Error('A IA não retornou um conteúdo válido das imagens.')
       }
     } catch (e) {
       console.error('Screenshot AI error:', e)
       toast.error('Erro ao analisar imagens: ' + e.message)
+    } finally {
+      setScreenshotLoading(false)
     }
-    setScreenshotLoading(false)
   }
 
   function exportCSV() {

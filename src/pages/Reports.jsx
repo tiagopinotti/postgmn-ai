@@ -373,11 +373,13 @@ Não use headers markdown.`
 
   async function generateScreenshotReport() {
     if (!screenshots.length) return
+    console.log("Starting screenshot report generation with", screenshots.length, "images")
     setScreenshotLoading(true)
     const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
     
-    // Add same prompt logic for JSON output
-    const prompt = `Você é um estrategista de marketing digital. Analise as imagens de desempenho do Google Meu Negócio anexadas para o cliente "${clientName}".
+    // Prompt adapted for better JSON consistency
+    const prompt = `Você é um estrategista de marketing digital especialista em Google Meu Negócio. 
+Analise as imagens de desempenho anexadas para o cliente "${clientName}".
 Gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
 
 Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
@@ -385,17 +387,19 @@ Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
   "report": "Texto completo do relatório com Resumo, Destaques, Pontos de Atenção e Sugestões. Use emojis e parágrafos.",
   "zap": "Mensagem curta para WhatsApp apresentando o relatório."
 }
-Não use markdown headers.`
+Não use markdown headers nem texto fora do JSON.`
 
     try {
-      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
-      const openaiKey = import.meta.env.VITE_OPENAI_API_KEY
+      // Use the same key names as ai.js and support localStorage
+      const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
+      const openaiKey = localStorage.getItem('API_KEY_OPENAI') || import.meta.env.VITE_OPENAI_KEY
       
       let reportData = null
 
-      // Try Gemini first if key exists
+      // Try Gemini first if key exists (supports multiple images natively in gemini-2.0-flash)
       if (geminiKey && geminiKey.length > 10) {
         try {
+          console.log("Attempting Gemini Vision...")
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -403,12 +407,13 @@ Não use markdown headers.`
               contents: [{
                 parts: [
                   { text: prompt },
-                  ...screenshots.map(img => ({
-                    inline_data: { 
-                      mime_type: "image/jpeg", 
-                      data: img.split(',')[1] 
+                  ...screenshots.map(img => {
+                    const [header, data] = img.split(',')
+                    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg"
+                    return {
+                      inline_data: { mime_type: mime, data: data }
                     }
-                  }))
+                  })
                 ]
               }],
               generationConfig: { responseMimeType: "application/json" }
@@ -417,15 +422,21 @@ Não use markdown headers.`
           const data = await res.json()
           if (res.ok) {
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
-            if (content) reportData = JSON.parse(content.replace(/```json|```/g, '').trim())
+            if (content) {
+              const clean = content.replace(/```json|```/g, '').trim()
+              reportData = JSON.parse(clean)
+            }
+          } else {
+            console.warn("Gemini Error:", data.error?.message)
           }
         } catch (err) {
-          console.error("Gemini Vision failed, falling back to OpenAI if possible", err)
+          console.error("Gemini Vision failed:", err)
         }
       }
 
       // Fallback to OpenAI Vision if Gemini failed or key missing
       if (!reportData && openaiKey && openaiKey.length > 10) {
+        console.log("Attempting OpenAI Vision...")
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -441,7 +452,7 @@ Não use markdown headers.`
                   { type: "text", text: prompt },
                   ...screenshots.map(img => ({
                     type: "image_url",
-                    image_url: { url: img }
+                    image_url: { url: img } // OpenAI handles dataURLs directly
                   }))
                 ]
               }
@@ -454,6 +465,7 @@ Não use markdown headers.`
           const content = data.choices?.[0]?.message?.content
           if (content) reportData = JSON.parse(content.trim())
         } else {
+          console.warn("OpenAI Error:", data.error?.message)
           throw new Error(data.error?.message || 'Erro na API da OpenAI')
         }
       }
@@ -461,7 +473,7 @@ Não use markdown headers.`
       if (reportData) {
         setScreenshotReport(reportData.report)
         setZapMessage(reportData.zap)
-        setAiReport(reportData.report)
+        setAiReport(reportData.report) // For consistency in export
 
         // Save to DB
         const { error: saveError } = await supabase.from('reports_ai').upsert({
@@ -473,14 +485,18 @@ Não use markdown headers.`
           user_id: user.id
         }, { onConflict: 'client_id,month,year' })
 
-        if (saveError) throw new Error('Erro ao salvar no banco: ' + saveError.message)
-        toast.success('Relatório gerado e salvo!')
+        if (saveError) {
+          console.error("DB Save Error:", saveError)
+          toast.error('Relatório gerado mas não pôde ser salvo autom.')
+        } else {
+          toast.success('Relatório gerado e salvo!')
+        }
       } else {
-        throw new Error('Não foi possível gerar o relatório. Verifique suas chaves de API (Gemini ou OpenAI) no arquivo .env.')
+        throw new Error('Nenhuma chave de IA (Gemini/OpenAI) disponível ou erro na análise. Verifique as chaves em Configurar API Keys.')
       }
     } catch (e) {
       console.error('Screenshot AI error:', e)
-      toast.error('Erro ao analisar imagens: ' + e.message)
+      toast.error(e.message || 'Erro ao analisar imagens')
     } finally {
       setScreenshotLoading(false)
     }

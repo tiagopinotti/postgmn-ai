@@ -298,79 +298,124 @@ Não use markdown headers.`
   }
 
   async function exportPDF() {
-    if (!aiReport) return
+    if (!aiReport) {
+      toast.error('Relatório não encontrado. Gere o relatório primeiro.')
+      return
+    }
+    
     const clientName = clients.find(c => c.id === selectedClient)?.company_name || 'Cliente'
+    console.log("Iniciando exportação de PDF para:", clientName)
 
     const element = document.createElement('div')
     element.id = 'temp-pdf-export'
-    element.style.padding = '40px'
-    element.style.fontFamily = 'Inter, system-ui, sans-serif'
+    element.style.padding = '50px'
+    element.style.fontFamily = 'Arial, sans-serif'
     element.style.color = '#1f2937'
     element.style.background = 'white'
-    element.style.position = 'fixed'
-    element.style.left = '-10000px'
+    element.style.position = 'absolute'
+    element.style.left = '0'
     element.style.top = '0'
-    element.style.width = '800px' // Fix width for better layout consistency
+    element.style.zIndex = '-1'
+    element.style.width = '700px' // Slightly smaller for better A4 fit
 
+    // Using tables or simple blocks instead of flex/grid for maximum PDF compatibility
     element.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid ${branding.color}; padding-bottom: 20px;">
-        <div>
-          ${branding.logo ? `<img src="${branding.logo}" style="height: 50px; width: auto; margin-bottom: 10px;" />` : `<h1 style="margin: 0; color: ${branding.color};">${branding.agency_name || 'Agência'}</h1>`}
-        </div>
-        <div style="text-align: right;">
-          <h2 style="margin: 0; font-size: 18px; color: ${branding.color};">Relatório Mensal de Performance</h2>
-          <p style="margin: 5px 0 0; color: #6b7280; font-size: 14px;">${MONTHS[month - 1]} ${year}</p>
-        </div>
+      <div style="border-bottom: 2px solid ${branding.color}; padding-bottom: 20px; margin-bottom: 30px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="vertical-align: middle;">
+              ${branding.logo ? `<img src="${branding.logo}" style="height: 50px; width: auto;" />` : `<h1 style="margin: 0; color: ${branding.color}; font-size: 24px;">${branding.agency_name || 'Agência'}</h1>`}
+            </td>
+            <td style="text-align: right; vertical-align: middle;">
+              <h2 style="margin: 0; font-size: 18px; color: ${branding.color};">Relatório de Performance</h2>
+              <p style="margin: 5px 0 0; color: #6b7280; font-size: 14px;">${MONTHS[month - 1]} ${year}</p>
+            </td>
+          </tr>
+        </table>
       </div>
 
       <div style="margin-bottom: 30px;">
-        <h3 style="font-size: 16px; margin-bottom: 10px; color: ${branding.color};">Resumo do Cliente</h3>
+        <h3 style="font-size: 16px; margin-bottom: 10px; color: ${branding.color};">Informações do Cliente</h3>
         <p style="margin: 0; font-size: 14px;"><strong>Cliente:</strong> ${clientName}</p>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 40px;">
-        ${[
-    { label: 'Interações', value: gmbData?.total_interactions || 0 },
-    { label: 'Visitas ao Site', value: gmbData?.website_clicks || 0 },
-    { label: 'Chamadas', value: gmbData?.call_clicks || 0 },
-    { label: 'Rotas', value: gmbData?.direction_requests || 0 },
-    { label: 'Busca GMB', value: (gmbData?.impressions_search || 0).toLocaleString() },
-    { label: 'Maps GMB', value: (gmbData?.impressions_maps || 0).toLocaleString() }
-  ].map(s => `
-          <div style="padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
-            <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; margin-bottom: 5px;">${s.label}</div>
-            <div style="font-size: 20px; font-weight: 700; color: ${branding.color};">${s.value}</div>
-          </div>
-        `).join('')}
+      <div style="margin-bottom: 30px;">
+        <h3 style="font-size: 16px; margin-bottom: 15px; color: ${branding.color};">Métricas do Período</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            ${[
+              { label: 'Interações', value: gmbData?.total_interactions || 0 },
+              { label: 'Visitas ao Site', value: gmbData?.website_clicks || 0 },
+              { label: 'Chamadas', value: gmbData?.call_clicks || 0 }
+            ].map(s => `
+              <td style="width: 33%; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">${s.label}</div>
+                <div style="font-size: 18px; font-weight: 700; color: ${branding.color};">${s.value}</div>
+              </td>
+            `).join('')}
+          </tr>
+          <tr><td style="height: 10px;"></td></tr>
+          <tr>
+            ${[
+              { label: 'Rotas', value: gmbData?.direction_requests || 0 },
+              { label: 'Busca GMB', value: (gmbData?.impressions_search || 0).toLocaleString() },
+              { label: 'Maps GMB', value: (gmbData?.impressions_maps || 0).toLocaleString() }
+            ].map(s => `
+              <td style="width: 33%; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">${s.label}</div>
+                <div style="font-size: 18px; font-weight: 700; color: ${branding.color};">${s.value}</div>
+              </td>
+            `).join('')}
+          </tr>
+        </table>
       </div>
 
-      <div style="line-height: 1.6; font-size: 14px; white-space: pre-wrap;">
-        ${aiReport}
+      <div style="margin-bottom: 30px;">
+        <h3 style="font-size: 16px; margin-bottom: 15px; color: ${branding.color};">Análise Estratégica</h3>
+        <div style="line-height: 1.6; font-size: 13px; color: #374151; white-space: pre-wrap;">
+          ${aiReport}
+        </div>
       </div>
 
-      <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
-        Relatório gerado por ${branding.agency_name || 'Agência'} via PostGMN AI.
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #9ca3af;">
+        Relatório gerado por ${branding.agency_name || 'Agência'} via PostGMN AI • ✨ Relatório de Performance Inteligente
       </div>
     `
 
     document.body.appendChild(element)
 
-    const opt = {
-      margin: 10,
-      filename: `Relatorio-${clientName.replace(/\s+/g, '-')}-${MONTHS[month - 1]}-${year}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }
+    // Give it a moment to render images/styles
+    setTimeout(() => {
+      const opt = {
+        margin: 10,
+        filename: `Relatorio-${clientName.replace(/\s+/g, '-')}-${MONTHS[month - 1]}-${year}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          logging: true,
+          letterRendering: true,
+          windowWidth: 800
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }
 
-    if (window.html2pdf) {
-      window.html2pdf().set(opt).from(element).save().then(() => {
+      if (window.html2pdf) {
+        window.html2pdf().set(opt).from(element).save()
+          .then(() => {
+            console.log("Exportação concluída com sucesso")
+            document.body.removeChild(element)
+          })
+          .catch(err => {
+            console.error("Erro no html2pdf:", err)
+            document.body.removeChild(element)
+            toast.error('Erro ao gerar PDF')
+          })
+      } else {
         document.body.removeChild(element)
-      })
-    } else {
-      document.body.removeChild(element)
-      toast.error('Aguarde o carregamento do gerador de PDF...')
-    }
+        toast.error('Gerador de PDF não inicializado.')
+      }
+    }, 500) // 500ms delay for rendering
   }
 
   function handleScreenshots(files) {

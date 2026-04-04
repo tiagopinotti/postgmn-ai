@@ -204,13 +204,21 @@ export default function Reports() {
   }
 
   async function generateAiReport() {
-    if (!gmbData?.connected) return
+    if (!selectedClient || !gmbData) {
+      toast.error('Métricas não carregadas ou cliente não selecionado.')
+      return
+    }
     setAiLoading(true)
 
     // Buscar relatório do mês anterior para comparação
     const prevMonth = month === 1 ? 12 : month - 1
     const prevYear = month === 1 ? year - 1 : year
-    const { data: prevReport } = await supabase.from('reports_ai').select('report_text').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle()
+    const { data: prevReport } = await supabase.from('reports_ai')
+      .select('report_text')
+      .eq('client_id', selectedClient)
+      .eq('month', prevMonth)
+      .eq('year', prevYear)
+      .maybeSingle()
 
     const client = clients.find(c => c.id === selectedClient)
     const clientName = client?.company_name || 'Cliente'
@@ -222,10 +230,8 @@ ${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do
 Dados reais do período:
 - Total de Interações: ${gmbData.total_interactions || 0}
 - Cliques no Site: ${gmbData.website_clicks || 0}
-- Chamadas: ${gmbData.call_clicks || 0}
+- Cliques no Telefone: ${gmbData.call_clicks || 0}
 - Pedidos de Rota: ${gmbData.direction_requests || 0}
-- Mensagens: ${gmbData.conversations || 0}
-- Agendamentos: ${gmbData.bookings || 0}
 - Impressões na Busca: ${gmbData.impressions_search || 0}
 - Impressões no Maps: ${gmbData.impressions_maps || 0}`
 
@@ -245,30 +251,43 @@ Não use markdown headers.`
       const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
       let content = ''
 
-      if (openAIKey && openAIKey.length > 10) {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openAIKey}` },
-          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 1500, response_format: { type: 'json_object' } })
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error?.message || 'Erro na API da OpenAI')
-        content = data.choices?.[0]?.message?.content
-      } else if (geminiKey && geminiKey.length > 10) {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
-        content = data.candidates?.[0]?.content?.parts?.[0]?.text
-      } else {
-        throw new Error('Nenhuma chave de API (OpenAI ou Gemini/Google) configurada corretamente.')
+      try {
+        if (openAIKey && openAIKey.length > 10) {
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openAIKey}` },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: 1500,
+            })
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error?.message || 'Erro na API da OpenAI')
+          content = data.choices?.[0]?.message?.content
+        } else if (geminiKey && geminiKey.length > 10) {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error?.message || 'Erro na API do Gemini')
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text
+        } else {
+          throw new Error('Nenhuma chave de API (OpenAI ou Gemini/Google) configurada corretamente.')
+        }
+      } catch (error) {
+        if (error.message === 'Failed to fetch') {
+          throw new Error('Falha de conexão com a IA (CORS ou rede). Verifique se suas chaves API estão corretas nas Configurações.')
+        }
+        throw error
       }
 
       if (content) {
-        // Limpar possíveis marcações de markdown se a IA ignorar a instrução JSON pura
         const cleanJson = content.replace(/```json|```/g, '').trim()
         const parsed = JSON.parse(cleanJson)
         setAiReport(parsed.report)
@@ -316,9 +335,8 @@ Não use markdown headers.`
     element.style.left = '0'
     element.style.top = '0'
     element.style.zIndex = '-1'
-    element.style.width = '700px' // Slightly smaller for better A4 fit
+    element.style.width = '700px'
 
-    // Using tables or simple blocks instead of flex/grid for maximum PDF compatibility
     element.innerHTML = `
       <div style="border-bottom: 2px solid ${branding.color}; padding-bottom: 20px; margin-bottom: 30px;">
         <table style="width: 100%;">
@@ -376,36 +394,22 @@ Não use markdown headers.`
           ${aiReport}
         </div>
       </div>
-
-      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #9ca3af;">
-        Relatório gerado por ${branding.agency_name || 'Agência'} via PostGMN AI • ✨ Relatório de Performance Inteligente
-      </div>
     `
 
     document.body.appendChild(element)
 
-    // Give it a moment to render images/styles
     setTimeout(() => {
       const opt = {
         margin: 10,
         filename: `Relatorio-${clientName.replace(/\s+/g, '-')}-${MONTHS[month - 1]}-${year}.pdf`,
         image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          logging: true,
-          letterRendering: true,
-          windowWidth: 800
-        },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, windowWidth: 800 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }
 
       if (window.html2pdf) {
         window.html2pdf().set(opt).from(element).save()
-          .then(() => {
-            console.log("Exportação concluída com sucesso")
-            document.body.removeChild(element)
-          })
+          .then(() => document.body.removeChild(element))
           .catch(err => {
             console.error("Erro no html2pdf:", err)
             document.body.removeChild(element)
@@ -415,7 +419,7 @@ Não use markdown headers.`
         document.body.removeChild(element)
         toast.error('Gerador de PDF não inicializado.')
       }
-    }, 500) // 500ms delay for rendering
+    }, 500)
   }
 
   function handleScreenshots(files) {
@@ -431,44 +435,39 @@ Não use markdown headers.`
   }
 
   async function generateScreenshotReport() {
-    if (!screenshots.length) return
-    console.log("Starting screenshot report generation with", screenshots.length, "images")
+    if (!screenshots.length) {
+      toast.error('Selecione ao menos um print para analisar.')
+      return
+    }
     setScreenshotLoading(true)
     const client = clients.find(c => c.id === selectedClient)
     const clientName = client?.company_name || 'Cliente'
     const contactName = client?.contact_name || ''
     
-    // Prompt adapted for better JSON consistency
     const prompt = `Você é um estrategista de marketing digital especialista em Google Meu Negócio. 
-Analise os dados de desempenho para o cliente "${clientName}":
+Analise os dados de desempenho (prints anexados) para o cliente "${clientName}".
+Métricas do Google:
 - Interações: ${gmbData?.total_interactions || 0}
-- Visitas ao Site: ${gmbData?.website_clicks || 0}
-- Chamadas: ${gmbData?.call_clicks || 0}
-- Rotas: ${gmbData?.direction_requests || 0}
-- Busca GMB: ${gmbData?.impressions_search || 0}
-- Maps GMB: ${gmbData?.impressions_maps || 0}
+- Busca: ${gmbData?.impressions_search || 0}
+- Maps: ${gmbData?.impressions_maps || 0}
 
 Gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
 ${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do WhatsApp.` : ''}
 
 Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
 {
-  "report": "Texto completo do relatório com Resumo, Destaques, Pontos de Atenção e Sugestões. Use emojis e parágrafos.",
-  "zap": "Mensagem curta para WhatsApp apresentando o relatório. Comece com 'Olá ${contactName || 'tudo bem'},' se apropriado."
+  "report": "Análise detalhada baseada nos prints. Destaque pontos de sucesso e melhoria.",
+  "zap": "Mensagem para WhatsApp. Comece com 'Olá ${contactName || 'tudo bem'}'."
 }
-Não use markdown headers nem texto fora do JSON.`
+Não use markdown headers.`
 
     try {
-      // Use the same key names as ai.js and support localStorage
       const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
       const openaiKey = localStorage.getItem('API_KEY_OPENAI') || import.meta.env.VITE_OPENAI_KEY
-      
       let reportData = null
 
-      // Try Gemini first if key exists (supports multiple images natively in gemini-2.0-flash)
-      if (geminiKey && geminiKey.length > 10) {
-        try {
-          console.log("Attempting Gemini Vision...")
+      try {
+        if (geminiKey && geminiKey.length > 10) {
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -479,9 +478,7 @@ Não use markdown headers nem texto fora do JSON.`
                   ...screenshots.map(img => {
                     const [header, data] = img.split(',')
                     const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg"
-                    return {
-                      inline_data: { mime_type: mime, data: data }
-                    }
+                    return { inline_data: { mime_type: mime, data } }
                   })
                 ]
               }],
@@ -491,61 +488,45 @@ Não use markdown headers nem texto fora do JSON.`
           const data = await res.json()
           if (res.ok) {
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
-            if (content) {
-              const clean = content.replace(/```json|```/g, '').trim()
-              reportData = JSON.parse(clean)
-            }
-          } else {
-            console.warn("Gemini Error:", data.error?.message)
+            if (content) reportData = JSON.parse(content.replace(/```json|```/g, '').trim())
           }
-        } catch (err) {
-          console.error("Gemini Vision failed:", err)
         }
-      }
 
-      // Fallback to OpenAI Vision if Gemini failed or key missing
-      if (!reportData && openaiKey && openaiKey.length > 10) {
-        console.log("Attempting OpenAI Vision...")
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openaiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
+        if (!reportData && openaiKey && openaiKey.length > 10) {
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              messages: [{
                 role: "user",
                 content: [
                   { type: "text", text: prompt },
-                  ...screenshots.map(img => ({
-                    type: "image_url",
-                    image_url: { url: img } // OpenAI handles dataURLs directly
-                  }))
+                  ...screenshots.map(url => ({ type: "image_url", image_url: { url } }))
                 ]
-              }
-            ],
-            response_format: { type: "json_object" }
+              }],
+              response_format: { type: "json_object" }
+            })
           })
-        })
-        const data = await res.json()
-        if (res.ok) {
-          const content = data.choices?.[0]?.message?.content
-          if (content) reportData = JSON.parse(content.trim())
-        } else {
-          console.warn("OpenAI Error:", data.error?.message)
-          throw new Error(data.error?.message || 'Erro na API da OpenAI')
+          const data = await res.json()
+          if (res.ok) {
+            const content = data.choices?.[0]?.message?.content
+            if (content) reportData = JSON.parse(content.trim())
+          }
         }
+      } catch (error) {
+        if (error.message === 'Failed to fetch') {
+          throw new Error('Falha de conexão com a IA (CORS ou rede).')
+        }
+        throw error
       }
 
       if (reportData) {
         setScreenshotReport(reportData.report)
         setZapMessage(reportData.zap)
-        setAiReport(reportData.report) // For consistency in export
+        setAiReport(reportData.report)
 
-        // Save to DB
-        const { error: saveError } = await supabase.from('reports_ai').upsert({
+        await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
           year,
@@ -553,19 +534,13 @@ Não use markdown headers nem texto fora do JSON.`
           zap_message: reportData.zap,
           user_id: user.id
         }, { onConflict: 'client_id,month,year' })
-
-        if (saveError) {
-          console.error("DB Save Error:", saveError)
-          toast.error('Relatório gerado mas não pôde ser salvo autom.')
-        } else {
-          toast.success('Relatório gerado e salvo!')
-        }
+        toast.success('Relatório gerado com sucesso!')
       } else {
-        throw new Error('Nenhuma chave de IA (Gemini/OpenAI) disponível ou erro na análise. Verifique as chaves em Configurar API Keys.')
+        throw new Error('Nenhuma IA disponível ou erro na análise.')
       }
     } catch (e) {
       console.error('Screenshot AI error:', e)
-      toast.error(e.message || 'Erro ao analisar imagens')
+      toast.error(e.message)
     } finally {
       setScreenshotLoading(false)
     }

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { callAI, extractJSON } from '../lib/ai.js'
 import { generateAIImage } from '../lib/imageGen.js'
 import { supabase } from '../lib/supabase'
-import { TEMPLATES, drawPostImage } from '../lib/imageRenderer.js'
+import { TEMPLATES, drawPostImage, BASE_TEMPLATE } from '../lib/imageRenderer.js'
 
 const IconDownload = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 const IconSpark = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/></svg>
@@ -28,8 +28,9 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
   const [rendering, setRendering] = useState(false)
   const [savingDB, setSavingDB] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [aiError, setAiError] = useState('')
 
-  const tpl = dynamicTemplates.find(t => t.id === selectedTemplate) || dynamicTemplates[0] || null
+  const tpl = dynamicTemplates.find(t => t.id === selectedTemplate) || dynamicTemplates[0] || BASE_TEMPLATE
 
   useEffect(() => {
     const defaultTpl = post?.image_template || dynamicTemplates[0]?.id || ''
@@ -141,7 +142,7 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
       }
     } catch(e) {
       console.error(e)
-      alert('Erro ao gerar foto: ' + e.message)
+      setAiError(e.message)
     } finally {
       setGeneratingPhoto(false)
     }
@@ -188,6 +189,12 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
+      {aiError && (
+        <div className="alert alert-error" style={{ margin: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>❌ {aiError}</span>
+          <button onClick={() => setAiError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}>×</button>
+        </div>
+      )}
       <div className="card-header">
         <h3>🖼️ Criativo para Post</h3>
         <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>Gera imagem com texto para aprovação/download</span>

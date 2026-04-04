@@ -45,6 +45,9 @@ export async function generateAIImage(prompt, options = {}) {
       const data = await res.json()
       return `data:image/png;base64,${data.data[0].base64}`
     } catch(error) {
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Falha de conexão com a Freepik (CORS). Tente usar a OpenAI para gerar imagens ou verifique sua chave.')
+      }
       console.error('Image Gen Error Freepik:', error)
       throw error
     }
@@ -74,6 +77,9 @@ export async function generateAIImage(prompt, options = {}) {
       const data = await res.json()
       return `data:image/png;base64,${data.predictions[0].bytesBase64}`
     } catch (error) {
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Falha de conexão com o Google Imagen. O Google restringe a geração de imagens em algumas regiões (incluindo Brasil via API). Tente usar a OpenAI.')
+      }
       console.error('Image Gen Error Gemini:', error)
       throw error
     }
@@ -106,6 +112,9 @@ export async function generateAIImage(prompt, options = {}) {
       const data = await res.json()
       return `data:image/png;base64,${data.data[0].b64_json}`
     } catch(error) {
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Falha de conexão com a OpenAI (DALL-E). Verifique sua conexão ou saldo na plataforma.')
+      }
       console.error('Image Gen Error DALL-E:', error)
       throw error
     }

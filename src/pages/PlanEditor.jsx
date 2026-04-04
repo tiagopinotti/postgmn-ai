@@ -101,6 +101,10 @@ export default function PlanEditor() {
   }
 
   async function generateCalendar() {
+    if (!client || !plan) {
+      setAiError('Dados do cliente ou plano não carregados.')
+      return
+    }
     setGeneratingCalendar(true); setAiError('')
     try {
       const prompt = `Você é um estrategista de conteúdo para Google Meu Negócio no Brasil.
@@ -159,6 +163,10 @@ Formato esperado (array JSON):
   }
 
   async function generatePostContent(post) {
+    if (!post || !client) {
+      setAiError('Post ou cliente não identificado.')
+      return
+    }
     setGeneratingPost(post.id); setAiError('')
     try {
       const prompts = [

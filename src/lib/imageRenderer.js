@@ -8,6 +8,14 @@ const DEFAULT_LAYOUT = {
 
 // Legacy hardcoded templates (removed to ensure clean start for new clients)
 export const TEMPLATES = {}
+export const BASE_TEMPLATE = {
+  id: 'default',
+  name: 'Padrão',
+  bg_color: '#4F46E5',
+  text_color: '#1a1a1a',
+  text_bg_color: '#FFFFFFEE',
+  visual_style: 'clean'
+}
 
 
 // Helper: load image as promise
@@ -88,8 +96,11 @@ function fitText(ctx, text, maxWidth, startSize) {
 export async function drawPostImage(canvas, tpl, text, userImageSrc) {
   if (!canvas) return false
   
+  // Use BASE_TEMPLATE if none provided
+  if (!tpl) tpl = BASE_TEMPLATE
+
   // Legacy support: if tpl is a string key, look up hardcoded
-  if (typeof tpl === 'string') tpl = TEMPLATES[tpl] || TEMPLATES.ingles
+  if (typeof tpl === 'string') tpl = TEMPLATES[tpl] || BASE_TEMPLATE
 
   // If legacy template with .file field, use old rendering
   if (tpl.file && !tpl.bg_color) {

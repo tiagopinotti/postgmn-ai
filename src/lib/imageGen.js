@@ -18,13 +18,18 @@ export async function generateAIImage(prompt, options = {}) {
 
     try {
       const targetUrl = 'https://api.freepik.com/v1/ai/text-to-image'
+      // Tentativa de usar o proxy sem duplicar a interrogação e com tratamento de erro mais claro
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+      
+      console.log('--- Iniciando Geração Freepik ---')
+      console.log('Prompt:', fullPrompt)
+      
       const res = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'x-freepik-api-key': key
+          'Content-Type': 'application/json',
+          'x-freepik-api-key': key.trim()
         },
         body: JSON.stringify({
           prompt: fullPrompt,
@@ -38,17 +43,27 @@ export async function generateAIImage(prompt, options = {}) {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || `Erro Freepik: ${res.status}`)
+        let errorDetail = ''
+        try {
+          const errData = await res.json()
+          errorDetail = errData?.error || errData?.message || JSON.stringify(errData)
+        } catch (e) {
+          errorDetail = `Status ${res.status}: ${res.statusText}`
+        }
+        console.error('Erro Resposta Freepik:', errorDetail)
+        throw new Error(errorDetail)
       }
 
       const data = await res.json()
+      if (!data?.data?.[0]?.base64) {
+        throw new Error('Resposta da Freepik não contém dados da imagem.')
+      }
       return `data:image/png;base64,${data.data[0].base64}`
     } catch(error) {
-      if (error.message === 'Failed to fetch') {
-        throw new Error('Falha de conexão com a Freepik (CORS). Tente usar a OpenAI para gerar imagens ou verifique sua chave.')
+      console.error('Erro Catastrófico Freepik:', error)
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        throw new Error('Falha de conexão com a Freepik (CORS). Isso geralmente ocorre porque o navegador bloqueia a requisição direta. Tente usar a OpenAI ou verifique se sua chave está correta.')
       }
-      console.error('Image Gen Error Freepik:', error)
       throw error
     }
   } else if (provider === 'gemini') {

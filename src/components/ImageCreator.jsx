@@ -20,6 +20,7 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
 
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [imageText, setImageText] = useState('')
+  const [imageSettings, setImageSettings] = useState({ x: 0, y: 0, zoom: 1 })
   const [localImage, setLocalImage] = useState(null)
   const [photoPrompt, setPhotoPrompt] = useState('')
   const [generatingPhoto, setGeneratingPhoto] = useState(false)
@@ -37,6 +38,7 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
     setSelectedTemplate(defaultTpl)
     setImageText(post?.image_text || '')
     setLocalImage(post?.image_url || null)
+    setImageSettings(post?.image_settings || { x: 0, y: 0, zoom: 1 })
   }, [post?.id, dbTemplates.length])
 
 
@@ -48,19 +50,21 @@ export default function ImageCreator({ post, client, services = [], aiProvider, 
         setSavedSuccess(false)
       }
     }
-  }, [selectedTemplate, imageText, localImage])
+  }, [selectedTemplate, imageText, localImage, imageSettings])
 
   async function saveToDB() {
     if (!post?.id) return
     setSavingDB(true)
     const { error } = await supabase.from('posts').update({
       image_template: selectedTemplate,
-      image_text: imageText
+      image_text: imageText,
+      image_settings: imageSettings
     }).eq('id', post.id)
     
     if (!error) {
        post.image_template = selectedTemplate
        post.image_text = imageText
+       post.image_settings = imageSettings
        setSavedSuccess(true)
        setTimeout(() => setSavedSuccess(false), 3000)
     }
@@ -126,12 +130,14 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
           image_url: publicUrl, 
           image_prompt: photoPrompt,
           image_text: imageText,
-          image_template: selectedTemplate
+          image_template: selectedTemplate,
+          image_settings: imageSettings
         }).eq('id', post.id)
         if (post) {
           post.image_url = publicUrl
           post.image_text = imageText
           post.image_template = selectedTemplate
+          post.image_settings = imageSettings
         }
         setLocalImage(publicUrl)
         setRendered(false)
@@ -153,7 +159,7 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
     setRendering(true)
     const canvas = canvasRef.current
     
-    const success = await drawPostImage(canvas, tpl, imageText, localImage)
+    const success = await drawPostImage(canvas, tpl, imageText, localImage, imageSettings)
     if (success) {
       setRendered(true)
       if (previewRef.current) {
@@ -162,6 +168,11 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
     }
     setRendering(false)
   }
+
+  // Effect to re-render when settings/text changes
+  useEffect(() => {
+    if (localImage) renderCanvas()
+  }, [imageSettings, imageText, selectedTemplate, localImage])
 
   function downloadImage() {
     if (!canvasRef.current || !rendered) return
@@ -356,17 +367,50 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
           )}
         </div>
 
-        {/* Preview */}
+        {/* Preview & Controls */}
         {hasText && (
-          <div style={{ border: '1px solid var(--gray-200)', borderRadius: 8, overflow: 'hidden', background: 'var(--gray-50)' }}>
-            <img ref={previewRef} alt="Preview do criativo"
-              style={{ width: '100%', display: 'block' }}
-            />
-            {!rendered && (
-              <div style={{ padding: '8px 12px', background: 'var(--primary-light)', fontSize: 12, color: 'var(--primary)', textAlign: 'center' }}>
-                Clique em "Atualizar preview" para visualizar as alterações no texto ou template
+          <div style={{ marginTop: 24 }}>
+            <div style={{ border: '1px solid var(--gray-200)', borderRadius: 12, overflow: 'hidden', background: 'var(--gray-50)', padding: 12 }}>
+              <div style={{ width: '100%', aspectRatio: '1/1', position: 'relative', overflow: 'hidden', borderRadius: 8, background: '#DDD', marginBottom: 12 }}>
+                {rendering && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', zIndex: 1, fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>Renderizando...</div>}
+                <img ref={previewRef} alt="Preview do criativo" style={{ width: '100%', display: 'block' }} />
               </div>
-            )}
+
+              {localImage && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, background: 'white', padding: 12, borderRadius: 8, border: '1px solid var(--gray-100)' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Ajuste Vertical</span>
+                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{imageSettings.y}px</span>
+                    </label>
+                    <input 
+                      type="range" min="-500" max="500" step="5"
+                      style={{ width: '100%', height: 6, borderRadius: 3, cursor: 'pointer' }}
+                      value={imageSettings.y || 0}
+                      onChange={(e) => setImageSettings(s => ({ ...s, y: parseInt(e.target.value) }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Zoom</span>
+                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{Math.round(imageSettings.zoom * 100)}%</span>
+                    </label>
+                    <input 
+                      type="range" min="1" max="4" step="0.05"
+                      style={{ width: '100%', height: 6, borderRadius: 3, cursor: 'pointer' }}
+                      value={imageSettings.zoom || 1}
+                      onChange={(e) => setImageSettings(s => ({ ...s, zoom: parseFloat(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!rendered && !localImage && (
+                <div style={{ padding: '8px 12px', background: 'var(--primary-light)', fontSize: 12, color: 'var(--primary)', textAlign: 'center', marginTop: 8, borderRadius: 6 }}>
+                  Clique em "Atualizar preview" para visualizar
+                </div>
+              )}
+            </div>
           </div>
         )}
 

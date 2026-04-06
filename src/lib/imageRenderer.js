@@ -92,8 +92,9 @@ function fitText(ctx, text, maxWidth, startSize) {
  * @param {object} tpl - template object (from DB or legacy)
  * @param {string} text - text to render
  * @param {string} [userImageSrc] - optional user-uploaded photo for the image area
+ * @param {object} [imageSettings] - optional {x, y, zoom} offsets
  */
-export async function drawPostImage(canvas, tpl, text, userImageSrc) {
+export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettings = { x: 0, y: 0, zoom: 1 }) {
   if (!canvas) return false
   
   // Use BASE_TEMPLATE if none provided
@@ -172,10 +173,22 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc) {
       ctx.save()
       roundRect(ctx, ia.x, ia.y, ia.w, ia.h, 10)
       ctx.clip()
-      // Cover crop
-      const imgScale = Math.max(ia.w / img.width, ia.h / img.height)
-      const sw = img.width * imgScale, sh = img.height * imgScale
-      ctx.drawImage(img, ia.x + (ia.w - sw) / 2, ia.y + (ia.h - sh) / 2, sw, sh)
+      // Cover crop with adjustable offsets and zoom
+      const baseScale = Math.max(ia.w / img.width, ia.h / img.height)
+      const zoom = imageSettings?.zoom || 1
+      const imgScale = baseScale * zoom
+      
+      const sw = img.width * imgScale
+      const sh = img.height * imgScale
+      
+      // Calculate position: center + user offsets
+      const offsetX = imageSettings?.x || 0
+      const offsetY = imageSettings?.y || 0
+      
+      const dx = ia.x + (ia.w - sw) / 2 + offsetX
+      const dy = ia.y + (ia.h - sh) / 2 + offsetY
+      
+      ctx.drawImage(img, dx, dy, sw, sh)
       ctx.restore()
     } catch {
       drawImagePlaceholder(ctx, ia)

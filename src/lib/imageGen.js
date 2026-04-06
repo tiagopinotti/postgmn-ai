@@ -1,4 +1,5 @@
 // Utilitário para geração de imagens via IA (Freepik / OpenAI / Gemini)
+import { supabase } from './supabase'
 // Chave no .env: VITE_GOOGLE_AI_KEY ou VITE_FAL_KEY
 
 export async function generateAIImage(prompt, options = {}) {
@@ -17,53 +18,33 @@ export async function generateAIImage(prompt, options = {}) {
     if (!key) throw new Error('Chave da Freepik não configurada. Configure na engrenagem ⚙️')
 
     try {
-      const targetUrl = 'https://api.freepik.com/v1/ai/text-to-image'
-      // Tentativa de usar o proxy sem duplicar a interrogação e com tratamento de erro mais claro
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
-      
-      console.log('--- Iniciando Geração Freepik ---')
+      console.log('--- Iniciando Geração Freepik via Edge Function ---')
       console.log('Prompt:', fullPrompt)
       
-      const res = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'x-freepik-api-key': key.trim()
-        },
-        body: JSON.stringify({
+      const { data: result, error: funcError } = await supabase.functions.invoke('generate-freepik', {
+        body: {
           prompt: fullPrompt,
-          guidance_scale: 2,
-          seed: Math.floor(Math.random() * 99999),
-          num_images: 1,
+          apiKey: key.trim(),
           image: {
             size: aspect_ratio === '1:1' ? 'square_1_1' : 'landscape_4_3'
           }
-        })
+        }
       })
 
-      if (!res.ok) {
-        let errorDetail = ''
-        try {
-          const errData = await res.json()
-          errorDetail = errData?.error || errData?.message || JSON.stringify(errData)
-        } catch (e) {
-          errorDetail = `Status ${res.status}: ${res.statusText}`
-        }
-        console.error('Erro Resposta Freepik:', errorDetail)
+      if (funcError) {
+        console.error('Erro na Invocação da Function:', funcError)
+        throw new Error(`Erro na Edge Function: ${funcError.message}`)
+      }
+
+      if (!result?.data?.[0]?.base64) {
+        const errorDetail = result?.error || 'Resposta da Freepik não contém dados da imagem.'
+        console.error('Erro Resposta Freepik (via Function):', errorDetail)
         throw new Error(errorDetail)
       }
 
-      const data = await res.json()
-      if (!data?.data?.[0]?.base64) {
-        throw new Error('Resposta da Freepik não contém dados da imagem.')
-      }
-      return `data:image/png;base64,${data.data[0].base64}`
+      return `data:image/png;base64,${result.data[0].base64}`
     } catch(error) {
       console.error('Erro Catastrófico Freepik:', error)
-      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-        throw new Error('Falha de conexão com a Freepik (CORS). Isso geralmente ocorre porque o navegador bloqueia a requisição direta. Tente usar a OpenAI ou verifique se sua chave está correta.')
-      }
       throw error
     }
   } else if (provider === 'gemini') {

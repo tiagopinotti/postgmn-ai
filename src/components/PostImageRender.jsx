@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { drawPostImage } from '../lib/imageRenderer.js'
 
-export default function PostImageRender({ templateKey, text, style }) {
+export default function PostImageRender({ template, text, style, templateKey }) {
   const canvasRef = useRef(null)
   const [renderedSrc, setRenderedSrc] = useState('')
 
@@ -10,7 +10,7 @@ export default function PostImageRender({ templateKey, text, style }) {
     async function render() {
       if (!canvasRef.current || !text) return
       const canvas = canvasRef.current
-      const success = await drawPostImage(canvas, templateKey || 'ingles', text)
+      const success = await drawPostImage(canvas, template || templateKey || 'ingles', text)
       if (success && active) {
         setRenderedSrc(canvas.toDataURL('image/png', 0.85))
       }

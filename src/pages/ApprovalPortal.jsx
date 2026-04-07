@@ -50,7 +50,7 @@ export default function ApprovalPortal() {
 
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*')
+      .select('*, post_templates(*)')
       .eq('content_plan_id', linkData.content_plan_id)
       .order('scheduled_date')
 
@@ -280,9 +280,9 @@ export default function ApprovalPortal() {
                           <img src={post.image_url} alt="Post preview" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--gray-200)', objectFit: 'cover' }} />
                        </div>
                     ) : post.image_text && (
-                       <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
-                         <PostImageRender templateKey={post.image_template} text={post.image_text} />
-                       </div>
+                        <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
+                          <PostImageRender template={post.post_templates} text={post.image_text} />
+                        </div>
                     )}
                     {post.post_text && (
                       <div style={{

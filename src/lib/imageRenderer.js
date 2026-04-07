@@ -91,7 +91,15 @@ function fitText(ctx, text, maxWidth, startSize) {
     lines = tryFit(fontSize)
   }
 
-  return { lines, fontSize }
+  // Calculate max width of lines to define the dynamic box size
+  ctx.font = `bold ${fontSize}px "Inter", "Arial", sans-serif`
+  let maxLineWidth = 0
+  lines.forEach(line => {
+    const w = ctx.measureText(line).width
+    if (w > maxLineWidth) maxLineWidth = w
+  })
+
+  return { lines, fontSize, maxLineWidth }
 }
 
 /**
@@ -142,33 +150,44 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
     ctx.fillRect(0, 0, W, H)
   }
 
-  // 2. Text box
-  const tb = { 
-    ...L.textBox,
-    x: tpl.text_box_x !== undefined && tpl.text_box_x !== null ? tpl.text_box_x : L.textBox.x,
-    y: tpl.text_box_y !== undefined && tpl.text_box_y !== null ? tpl.text_box_y : L.textBox.y
-  }
-  const tbColor = tpl.text_bg_color || '#FFFFFF'
-  ctx.fillStyle = tbColor
-  roundRect(ctx, tb.x, tb.y, tb.w, tb.h, 16)
-  ctx.fill()
-
-  // 3. Text
+  // 3. Dynamic Text Box & Text
   if (text && text.trim()) {
     const padding = tpl.text_padding || 30
     const startFontSize = tpl.font_size || 42
-    const { lines, fontSize } = fitText(ctx, text, tb.w - padding * 2, startFontSize)
+    
+    // First, find the best fit for text
+    const { lines, fontSize, maxLineWidth } = fitText(ctx, text, L.textBox.w - padding * 2, startFontSize)
+    
     const lineH = fontSize * 1.3
-    const totalH = lines.length * lineH
-    const startY = tb.y + (tb.h - totalH) / 2 + lineH / 2
+    const totalContentH = lines.length * lineH
+    
+    // Dynamic Box Dimensions
+    const dynamicBoxW = maxLineWidth + padding * 2
+    const dynamicBoxH = totalContentH + padding * 2
+    
+    // Anchor Point (Position)
+    const boxX = (tpl.text_box_x !== undefined && tpl.text_box_x !== null) 
+      ? tpl.text_box_x - (dynamicBoxW / 2) // Center horizontally on the chosen X
+      : L.textBox.x + (L.textBox.w - dynamicBoxW) / 2
+      
+    const boxY = (tpl.text_box_y !== undefined && tpl.text_box_y !== null)
+      ? tpl.text_box_y - (dynamicBoxH / 2) // Center vertically on the chosen Y
+      : L.textBox.y + (L.textBox.h - dynamicBoxH) / 2
 
+    // Draw the Adaptive Background
+    ctx.fillStyle = tpl.text_bg_color || '#FFFFFF'
+    roundRect(ctx, boxX, boxY, dynamicBoxW, dynamicBoxH, 16)
+    ctx.fill()
+
+    // Draw the Text
+    const startTextY = boxY + padding + lineH / 2
     ctx.fillStyle = tpl.text_color || '#1a1a1a'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.font = `bold ${fontSize}px "Inter", "Arial", sans-serif`
 
     lines.forEach((line, i) => {
-      ctx.fillText(line, tb.x + tb.w / 2, startY + i * lineH)
+      ctx.fillText(line, boxX + dynamicBoxW / 2, startTextY + i * lineH)
     })
   }
 
@@ -304,30 +323,44 @@ export async function drawTemplateThumbnail(canvas, tpl) {
     ctx.fillRect(0, 0, W, H)
   }
 
-  // Text box placeholder
-  const tb = { 
-    ...L.textBox,
-    x: tpl.text_box_x !== undefined && tpl.text_box_x !== null ? tpl.text_box_x : L.textBox.x,
-    y: tpl.text_box_y !== undefined && tpl.text_box_y !== null ? tpl.text_box_y : L.textBox.y
-  }
-  ctx.fillStyle = tpl.text_bg_color || '#FFFFFF'
-  roundRect(ctx, dx + tb.x * scale, dy + tb.y * scale, tb.w * scale, tb.h * scale, 4)
-  ctx.fill()
-
-  // Lorem Ipsum Text Preview
+  // Lorem Ipsum Dynamic Box & Text Preview
   const padding = (tpl.text_padding || 30) * scale
   const fontSize = (tpl.font_size || 42) * scale
-  ctx.fillStyle = tpl.text_color || '#1a1a1a'
   ctx.font = `bold ${fontSize}px "Inter", "Arial", sans-serif`
+  
+  const previewLines = ["Título do Post", "Exemplo de Texto"]
+  let maxW = 0
+  previewLines.forEach(l => {
+    const w = ctx.measureText(l).width
+    if (w > maxW) maxW = w
+  })
+
+  const dynamicBoxW = maxW + padding * 2
+  const lineH = fontSize * 1.2
+  const dynamicBoxH = (previewLines.length * lineH) + padding * 2
+
+  // Position (Relative to thumbnail)
+  const boxX = (tpl.text_box_x !== undefined && tpl.text_box_x !== null) 
+    ? dx + (tpl.text_box_x * scale) - (dynamicBoxW / 2)
+    : dx + (L.textBox.x * scale) + (L.textBox.w * scale - dynamicBoxW) / 2
+
+  const boxY = (tpl.text_box_y !== undefined && tpl.text_box_y !== null)
+    ? dy + (tpl.text_box_y * scale) - (dynamicBoxH / 2)
+    : dy + (L.textBox.y * scale) + (L.textBox.h * scale - dynamicBoxH) / 2
+
+  // Draw background
+  ctx.fillStyle = tpl.text_bg_color || '#FFFFFF'
+  roundRect(ctx, boxX, boxY, dynamicBoxW, dynamicBoxH, 4)
+  ctx.fill()
+
+  // Draw text
+  ctx.fillStyle = tpl.text_color || '#1a1a1a'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  const previewLines = ["Título do Post", "Exemplo de Texto"]
-  const maxWidth = (tb.w * scale) - padding * 2
-  const lineH = fontSize * 1.2
-  const startY = (dy + tb.y * scale) + (tb.h * scale / 2) - (lineH * (previewLines.length - 1) / 2)
+  const startY = boxY + padding + lineH / 2
   
   previewLines.forEach((line, i) => {
-    ctx.fillText(line, dx + (tb.x + tb.w / 2) * scale, startY + i * lineH)
+    ctx.fillText(line, boxX + dynamicBoxW / 2, startY + i * lineH)
   })
 
   // Image area

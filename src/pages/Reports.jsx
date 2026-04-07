@@ -466,11 +466,12 @@ Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
     "website_clicks": 0,
     "call_clicks": 0,
     "direction_requests": 0,
+    "conversations": 0,
     "impressions_search": 0,
     "impressions_maps": 0
   }
 }
-No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não encontrar algum, use 0. Não use markdown headers.`
+No campo metrics, use APENAS NÚMEROS inteiros. Mapeie 'Cliques no chat' ou 'Mensagens' para 'conversations'. Mapeie 'Chamadas' para 'call_clicks' e 'Orientações' ou 'Rotas' para 'direction_requests'. Se não encontrar algum, use 0. Não use markdown headers.`
 
     try {
       const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
@@ -561,6 +562,7 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
             website_clicks: m.website_clicks || 0,
             call_clicks: m.call_clicks || 0,
             direction_requests: m.direction_requests || 0,
+            conversations: m.conversations || 0,
             impressions_search: m.impressions_search || 0,
             impressions_maps: m.impressions_maps || 0,
             fetched_at: new Date().toISOString()
@@ -572,6 +574,7 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
             website_clicks: m.website_clicks || 0,
             call_clicks: m.call_clicks || 0,
             direction_requests: m.direction_requests || 0,
+            conversations: m.conversations || 0,
             impressions_search: m.impressions_search || 0,
             impressions_maps: m.impressions_maps || 0
           })
@@ -780,12 +783,11 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
                     {/* GMB Metric Cards */}
                     <div className="stats-grid" style={{ marginBottom: 20 }}>
                       {[
-                        { label: 'Total Interações', value: gmbData.total_interactions || 0, color: '#4F46E5', sub: 'ações no perfil' },
-                        { label: 'Cliques no Site', value: gmbData.website_clicks || 0, color: '#22C55E', sub: 'visitas geradas' },
-                        { label: 'Chamadas', value: gmbData.call_clicks || 0, color: '#F59E0B', sub: 'ligações recebidas' },
-                        { label: 'Rotas', value: gmbData.direction_requests || 0, color: '#06B6D4', sub: 'pedidos de direção' },
-                        { label: 'Impressões Busca', value: (gmbData.impressions_search || 0).toLocaleString(), color: '#8B5CF6', sub: 'Google Search' },
-                        { label: 'Impressões Maps', value: (gmbData.impressions_maps || 0).toLocaleString(), color: '#EC4899', sub: 'Google Maps' },
+                        { label: 'Chamadas', value: gmbData.call_clicks || 0, color: '#F59E0B', sub: 'ligações' },
+                        { label: 'Chat', value: gmbData.conversations || 0, color: '#8B5CF6', sub: 'mensagens' },
+                        { label: 'Rotas', value: gmbData.direction_requests || 0, color: '#06B6D4', sub: 'orientações' },
+                        { label: 'Total Interações', value: gmbData.total_interactions || 0, color: '#4F46E5', sub: 'ações perfil' },
+                        { label: 'Site', value: gmbData.website_clicks || 0, color: '#22C55E', sub: 'visitas' },
                       ].map((s, i) => (
                         <div key={i} className="stat-card" style={{ borderTop: `3px solid ${s.color}` }}>
                           <div className="stat-label">{s.label}</div>

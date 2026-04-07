@@ -127,10 +127,11 @@ export default function PerformanceDashboard() {
       <div style={{ maxWidth: 1000, margin: '-40px auto 0', padding: '0 20px' }}>
         
         {/* Metric Grid */}
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '30px' }}>
           <MetricCard label="Interações Totais" value={metrics?.total_interactions || 0} color={primaryColor} />
-          <MetricCard label="Buscas no Google" value={(metrics?.impressions_search || 0).toLocaleString()} />
-          <MetricCard label="Visualizações Maps" value={(metrics?.impressions_maps || 0).toLocaleString()} />
+          <MetricCard label="Solicitações de Rotas" value={metrics?.direction_requests || 0} color="#06B6D4" />
+          <MetricCard label="Chamadas" value={metrics?.call_clicks || 0} color="#F59E0B" />
+          <MetricCard label="Cliques no Chat" value={metrics?.conversations || 0} color="#8B5CF6" />
           <MetricCard label="Cliques no Site" value={metrics?.website_clicks || 0} color="#10B981" />
         </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { drawTemplateThumbnail } from '../lib/imageRenderer.js'
+import { drawTemplateThumbnail, LAYOUTS } from '../lib/imageRenderer.js'
 
 const TABS = ['Dados gerais', 'Estratégia', 'Guia visual', 'Serviços', 'Google Meu Negócio']
 

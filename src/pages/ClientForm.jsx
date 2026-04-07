@@ -607,8 +607,8 @@ export default function ClientForm() {
                               <div className="form-group">
                                 <label className="form-label">Layout</label>
                                 <select className="form-select" value={editingTemplate.layout || 'default'} onChange={e => setEditingTemplate(p => ({ ...p, layout: e.target.value }))}>
-                                  <option value="default">Padrão (Topo)</option>
-                                  <option value="left">Texto na Esquerda</option>
+                                  <option value="default">960x720 (Texto no Topo)</option>
+                                  <option value="left">960x720 (Texto na Esquerda)</option>
                                 </select>
                               </div>
                               <div className="form-group">

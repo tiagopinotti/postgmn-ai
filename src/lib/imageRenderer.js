@@ -1,15 +1,15 @@
 // Template layouts
 export const LAYOUTS = {
-  default: {
-    canvas: { w: 1080, h: 1080 },
-    textBox: { x: 60, y: 60, w: 960, h: 200 },
-    imageArea: { x: 90, y: 290, w: 900, h: 560 },
-    logo: { x: 440, y: 900, maxW: 200, maxH: 120 },
-  },
-  left: {
+  default: { // Topo
     canvas: { w: 960, h: 720 },
-    textBox: { x: 70, y: 330, w: 520, h: 220 },
-    logo: { x: 140, y: 575, maxW: 280, maxH: 95 },
+    textBox: { x: 40, y: 40, w: 880, h: 220 },
+    imageArea: { x: 60, y: 280, w: 840, h: 400 },
+    logo: { x: 380, y: 690, maxW: 200, maxH: 100 },
+  },
+  left: { // Esquerda
+    canvas: { w: 960, h: 720 },
+    textBox: { x: 60, y: 220, w: 440, h: 200 },
+    logo: { x: 120, y: 550, maxW: 240, maxH: 80 },
     imageArea: null // Background is the image
   }
 }
@@ -22,7 +22,9 @@ export const BASE_TEMPLATE = {
   bg_color: '#4F46E5',
   text_color: '#1a1a1a',
   text_bg_color: '#FFFFFFEE',
-  visual_style: 'clean'
+  layout: 'default',
+  font_size: 42,
+  text_padding: 30
 }
 
 

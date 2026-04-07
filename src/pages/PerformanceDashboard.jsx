@@ -18,9 +18,20 @@ function MetricCard({ label, value, color }) {
       boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
       border: '1px solid var(--gray-100)',
       flex: 1,
-      minWidth: '200px'
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      minHeight: '100px'
     }}>
-      <div style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ 
+        fontSize: '11px', 
+        color: 'var(--gray-500)', 
+        fontWeight: 700, 
+        textTransform: 'uppercase', 
+        marginBottom: '6px', 
+        letterSpacing: '0.05em',
+        lineHeight: 1.4
+      }}>{label}</div>
       <div style={{ fontSize: '28px', fontWeight: 800, color: color || 'var(--gray-900)' }}>{value}</div>
     </div>
   )
@@ -69,16 +80,21 @@ export default function PerformanceDashboard() {
         setDbTemplates(tpls || [])
 
         // 4. Load Next Month Programming
-        const nextDate = new Date(reportData.year, reportData.month, 1) // Javascript months are 0-indexed, so reportData.month is actually the NEXT month index
-        const nextMonth = nextDate.getMonth() + 1
-        const nextYear = nextDate.getFullYear()
+        const nextMonthDate = new Date(reportData.year, reportData.month, 1) // reportData.month is March (3), JS Date(2026, 3, 1) is April 1st
+        const nextYear = nextMonthDate.getFullYear()
+        const nextMonthNum = nextMonthDate.getMonth() + 1
+        
+        // Final of that month (1st of the month after next)
+        const afterNextMonthDate = new Date(nextYear, nextMonthNum, 1)
+        const afterNextYear = afterNextMonthDate.getFullYear()
+        const afterNextMonthNum = afterNextMonthDate.getMonth() + 1
 
         const { data: postsData } = await supabase
           .from('posts')
           .select('*')
           .eq('client_id', reportData.client_id)
-          .gte('scheduled_date', `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`)
-          .lte('scheduled_date', `${nextYear}-${String(nextMonth).padStart(2, '0')}-31`)
+          .gte('scheduled_date', `${nextYear}-${String(nextMonthNum).padStart(2, '0')}-01`)
+          .lt('scheduled_date', `${afterNextYear}-${String(afterNextMonthNum).padStart(2, '0')}-01`)
           .order('scheduled_date')
         
         setNextMonthPosts(postsData || [])
@@ -127,7 +143,7 @@ export default function PerformanceDashboard() {
       <div style={{ maxWidth: 1000, margin: '-40px auto 0', padding: '0 20px' }}>
         
         {/* Metric Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '30px' }}>
           <MetricCard label="Interações Totais" value={metrics?.total_interactions || 0} color={primaryColor} />
           <MetricCard label="Solicitações de Rotas" value={metrics?.direction_requests || 0} color="#06B6D4" />
           <MetricCard label="Chamadas" value={metrics?.call_clicks || 0} color="#F59E0B" />

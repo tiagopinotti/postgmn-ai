@@ -103,13 +103,18 @@ export default function Reports() {
     const { data } = await supabase.from('reports_ai').select('id, report_text, zap_message').eq('client_id', selectedClient).eq('month', month).eq('year', year).maybeSingle()
     if (data) {
       setAiReport(data.report_text)
+      setScreenshotReport(data.report_text) // Sincroniza ambos para persistência
       setZapMessage(data.zap_message || '')
       setSavedReportId(data.id)
     } else {
       setAiReport('')
+      setScreenshotReport('')
       setZapMessage('')
       setSavedReportId(null)
     }
+    // Carregar também métricas e planos para o dashboard ficar completo ao carregar
+    loadGmbMetrics()
+    if (selectedClient !== 'all') loadCharts()
   }
 
   useEffect(() => {
@@ -211,15 +216,13 @@ export default function Reports() {
     }
     setAiLoading(true)
 
-    // Buscar relatório do mês anterior para comparação
+    // Buscar relatório e métricas do mês anterior para comparação
     const prevMonth = month === 1 ? 12 : month - 1
     const prevYear = month === 1 ? year - 1 : year
-    const { data: prevReport } = await supabase.from('reports_ai')
-      .select('report_text')
-      .eq('client_id', selectedClient)
-      .eq('month', prevMonth)
-      .eq('year', prevYear)
-      .maybeSingle()
+    const [{ data: prevReport }, { data: prevMetrics }] = await Promise.all([
+      supabase.from('reports_ai').select('report_text').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle(),
+      supabase.from('gmb_metrics').select('*').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle()
+    ])
 
     const client = clients.find(c => c.id === selectedClient)
     const clientName = client?.company_name || 'Cliente'
@@ -228,16 +231,28 @@ export default function Reports() {
     let prompt = `Você é um estrategista de marketing digital especializado em Google Meu Negócio. Gere um relatório profissional mensal em português para o cliente "${clientName}" referente a ${MONTHS[month - 1]} ${year}.
 ${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do WhatsApp.` : ''}
 
-Dados reais do período:
+Dados reais do período atual:
 - Total de Interações: ${gmbData.total_interactions || 0}
 - Cliques no Site: ${gmbData.website_clicks || 0}
-- Cliques no Telefone: ${gmbData.call_clicks || 0}
+- Chamadas: ${gmbData.call_clicks || 0}
 - Pedidos de Rota: ${gmbData.direction_requests || 0}
+- Cliques no Chat: ${gmbData.conversations || 0}
 - Impressões na Busca: ${gmbData.impressions_search || 0}
 - Impressões no Maps: ${gmbData.impressions_maps || 0}`
 
-    if (prevReport) {
-      prompt += `\n\nO cenário do mês anterior (${MONTHS[prevMonth - 1]} ${prevYear}) foi: ${prevReport.report_text.substring(0, 1000)}. Compare os resultados atuais com os anteriores para destacar evolução ou declínio.`
+    if (prevReport || prevMetrics) {
+      prompt += `\n\nCOMPARAÇÃO COM MÊS ANTERIOR (${MONTHS[prevMonth - 1]} ${prevYear}):`
+      if (prevMetrics) {
+        prompt += `\n- Interações Anterior: ${prevMetrics.total_interactions || 0}`
+        prompt += `\n- Site Anterior: ${prevMetrics.website_clicks || 0}`
+        prompt += `\n- Chamadas Anterior: ${prevMetrics.call_clicks || 0}`
+        prompt += `\n- Rotas Anterior: ${prevMetrics.direction_requests || 0}`
+        prompt += `\n- Chat Anterior: ${prevMetrics.conversations || 0}`
+      }
+      if (prevReport) {
+        prompt += `\n- Resumo do Relatório Anterior: ${prevReport.report_text.substring(0, 800)}`
+      }
+      prompt += `\n\nAnalise se houve crescimento ou queda e destaque isso no novo relatório de forma profissional.`
     }
 
     prompt += `\n\nRetorne EXCLUSIVAMENTE um JSON no seguinte formato:
@@ -447,15 +462,23 @@ Não use markdown headers.`
     const clientName = client?.company_name || 'Cliente'
     const contactName = client?.contact_name || ''
     
+    // Buscar histórico para comparação
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevYear = month === 1 ? year - 1 : year
+    const [{ data: prevReport }, { data: prevMetrics }] = await Promise.all([
+      supabase.from('reports_ai').select('report_text').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle(),
+      supabase.from('gmb_metrics').select('*').eq('client_id', selectedClient).eq('month', prevMonth).eq('year', prevYear).maybeSingle()
+    ])
+
     const prompt = `Você é um estrategista de marketing digital especialista em Google Meu Negócio. 
 Analise os dados de desempenho (prints anexados) para o cliente "${clientName}".
-Métricas do Google:
-- Interações: ${gmbData?.total_interactions || 0}
-- Busca: ${gmbData?.impressions_search || 0}
-- Maps: ${gmbData?.impressions_maps || 0}
-
-Gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
+Extraia os números reais dos prints e gere um relatório profissional detalhado referente a ${MONTHS[month - 1]} ${year}.
 ${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do WhatsApp.` : ''}
+
+${(prevReport || prevMetrics) ? `COMPARAÇÃO COM MÊS ANTERIOR (${MONTHS[prevMonth - 1]} ${prevYear}):
+${prevMetrics ? `- Interações anteriores: ${prevMetrics.total_interactions} | Rotas: ${prevMetrics.direction_requests} | Chamadas: ${prevMetrics.call_clicks} | Chat: ${prevMetrics.conversations} | Site: ${prevMetrics.website_clicks}` : ''}
+${prevReport ? `- Contexto do relatório anterior: ${prevReport.report_text.substring(0, 600)}` : ''}
+Compare os dados extraídos agora com os resultados anteriores para demonstrar evolução ou pontos de atenção.` : ''}
 
 Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
 {

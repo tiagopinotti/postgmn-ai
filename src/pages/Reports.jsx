@@ -808,23 +808,18 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
                           <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
                               <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>Análise Estratégica ✨</span>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="btn btn-primary btn-sm" onClick={() => {
-                                  if (savedReportId) {
-                                    const url = `${window.location.origin}/performance/${savedReportId}`
-                                    navigator.clipboard.writeText(url)
-                                    toast.success('Link do Dashboard copiado!')
-                                    window.open(url, '_blank')
-                                  } else {
-                                    toast.error('Relatório não salvo. Gere novamente.')
-                                  }
-                                }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  📱 Compartilhar Dashboard
-                                </button>
-                                <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <IconDownload /> PDF
-                                </button>
-                              </div>
+                              <button className="btn btn-primary btn-sm" onClick={() => {
+                                if (savedReportId) {
+                                  const url = `${window.location.origin}/performance/${savedReportId}`
+                                  navigator.clipboard.writeText(url)
+                                  toast.success('Link do Dashboard copiado!')
+                                  window.open(url, '_blank')
+                                } else {
+                                  toast.error('Relatório não salvo. Gere novamente.')
+                                }
+                              }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                🔗 Copiar Link Dashboard
+                              </button>
                             </div>
                             {aiReport}
                           </div>
@@ -930,23 +925,18 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
                     <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
                         <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>Análise Visual Estratégica ✨</span>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn btn-primary btn-sm" onClick={() => {
-                            if (savedReportId) {
-                              const url = `${window.location.origin}/performance/${savedReportId}`
-                              navigator.clipboard.writeText(url)
-                              toast.success('Link do Dashboard copiado!')
-                              window.open(url, '_blank')
-                            } else {
-                              toast.error('Relatório não salvo no banco. Tente novamente.')
-                            }
-                          }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            📱 Compartilhar Dashboard
-                          </button>
-                          <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <IconDownload /> PDF
-                          </button>
-                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={() => {
+                          if (savedReportId) {
+                            const url = `${window.location.origin}/performance/${savedReportId}`
+                            navigator.clipboard.writeText(url)
+                            toast.success('Link do Dashboard copiado!')
+                            window.open(url, '_blank')
+                          } else {
+                            toast.error('Relatório não salvo no banco. Tente novamente.')
+                          }
+                        }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          🔗 Copiar Link Dashboard
+                        </button>
                       </div>
                       {screenshotReport}
                     </div>

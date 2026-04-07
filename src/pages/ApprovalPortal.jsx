@@ -23,6 +23,7 @@ export default function ApprovalPortal() {
   const [client, setClient] = useState(null)
   const [plan, setPlan] = useState(null)
   const [posts, setPosts] = useState([])
+  const [dbTemplates, setDbTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(null)
@@ -48,13 +49,13 @@ export default function ApprovalPortal() {
     setClient(linkData.clients)
     setPlan(linkData.content_plans)
 
-    const { data: postsData } = await supabase
-      .from('posts')
-      .select('*, post_templates(*)')
-      .eq('content_plan_id', linkData.content_plan_id)
-      .order('scheduled_date')
+    const [ { data: postsData }, { data: tplsData } ] = await Promise.all([
+      supabase.from('posts').select('*').eq('content_plan_id', linkData.content_plan_id).order('scheduled_date'),
+      supabase.from('post_templates').select('*').eq('client_id', linkData.client_id)
+    ])
 
     setPosts(postsData || [])
+    setDbTemplates(tplsData || [])
     const fb = {}
     postsData?.forEach(p => { fb[p.id] = p.client_feedback || '' })
     setFeedbacks(fb)
@@ -281,7 +282,11 @@ export default function ApprovalPortal() {
                        </div>
                     ) : post.image_text && (
                         <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
-                          <PostImageRender template={post.post_templates} text={post.image_text} />
+                          <PostImageRender 
+                            template={dbTemplates.find(t => t.id === post.image_template)} 
+                            templateKey={post.image_template} 
+                            text={post.image_text} 
+                          />
                         </div>
                     )}
                     {post.post_text && (

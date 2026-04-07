@@ -1,5 +1,5 @@
 // Template layouts
-const LAYOUTS = {
+export const LAYOUTS = {
   default: {
     canvas: { w: 1080, h: 1080 },
     textBox: { x: 60, y: 60, w: 960, h: 200 },
@@ -7,9 +7,9 @@ const LAYOUTS = {
     logo: { x: 440, y: 900, maxW: 200, maxH: 120 },
   },
   left: {
-    canvas: { w: 1080, h: 1080 },
-    textBox: { x: 100, y: 505, w: 555, h: 210 },
-    logo: { x: 235, y: 745, maxW: 280, maxH: 85 },
+    canvas: { w: 960, h: 720 },
+    textBox: { x: 70, y: 330, w: 520, h: 220 },
+    logo: { x: 140, y: 575, maxW: 280, maxH: 95 },
     imageArea: null // Background is the image
   }
 }
@@ -116,14 +116,14 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
     return drawLegacyTemplate(canvas, tpl, text || '')
   }
 
-  const ctx = canvas.getContext('2d')
-  const W = 1080, H = 1080
-  canvas.width = W
-  canvas.height = H
-
   // Choose layout
   const layoutType = tpl.layout || 'default'
   const L = LAYOUTS[layoutType] || LAYOUTS.default
+
+  const ctx = canvas.getContext('2d')
+  const W = L.canvas.w, H = L.canvas.h
+  canvas.width = W
+  canvas.height = H
 
   // 1. Background
   if (tpl.bg_image_url) {
@@ -271,13 +271,17 @@ async function drawLegacyTemplate(canvas, tpl, text) {
  */
 export async function drawTemplateThumbnail(canvas, tpl) {
   if (!canvas) return
+  const L = LAYOUTS[tpl.layout || 'default'] || LAYOUTS.default
+
   const ctx = canvas.getContext('2d')
   const W = 270, H = 270
   canvas.width = W
   canvas.height = H
-  const scale = W / 1080
 
-  const L = LAYOUTS[tpl.layout || 'default'] || LAYOUTS.default
+  // Calculate scale and centering to fit L.canvas into 270x270 thumbnail
+  const scale = Math.min(W / L.canvas.w, H / L.canvas.h)
+  const dx = (W - L.canvas.w * scale) / 2
+  const dy = (H - L.canvas.h * scale) / 2
 
   // Background
   if (tpl.bg_image_url) {
@@ -297,7 +301,7 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   // Text box placeholder
   const tb = L.textBox
   ctx.fillStyle = tpl.text_bg_color || '#FFFFFFEE'
-  roundRect(ctx, tb.x * scale, tb.y * scale, tb.w * scale, tb.h * scale, 4)
+  roundRect(ctx, dx + tb.x * scale, dy + tb.y * scale, tb.w * scale, tb.h * scale, 4)
   ctx.fill()
 
   // Text placeholder lines
@@ -310,16 +314,16 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   const ia = L.imageArea
   if (ia) {
     ctx.fillStyle = '#FFFFFF'
-    roundRect(ctx, (ia.x - 10) * scale, (ia.y - 10) * scale, (ia.w + 20) * scale, (ia.h + 20) * scale, 4)
+    roundRect(ctx, dx + (ia.x - 10) * scale, dy + (ia.y - 10) * scale, (ia.w + 20) * scale, (ia.h + 20) * scale, 4)
     ctx.fill()
     ctx.fillStyle = '#E5E7EB'
-    roundRect(ctx, ia.x * scale, ia.y * scale, ia.w * scale, ia.h * scale, 3)
+    roundRect(ctx, dx + ia.x * scale, dy + ia.y * scale, ia.w * scale, ia.h * scale, 3)
     ctx.fill()
     ctx.fillStyle = '#9CA3AF'
     ctx.font = `${8}px Arial`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('📷', (ia.x + ia.w / 2) * scale, (ia.y + ia.h / 2) * scale)
+    ctx.fillText('📷', dx + (ia.x + ia.w / 2) * scale, dy + (ia.y + ia.h / 2) * scale)
   }
 
   // Logo placeholder
@@ -329,7 +333,7 @@ export async function drawTemplateThumbnail(canvas, tpl) {
       const lg = L.logo
       const logoScale = Math.min((lg.maxW * scale) / logo.width, (lg.maxH * scale) / logo.height, 1)
       const lw2 = logo.width * logoScale, lh2 = logo.height * logoScale
-      ctx.drawImage(logo, (lg.x * scale) + ((lg.maxW * scale) - lw2) / 2, (lg.y * scale) + ((lg.maxH * scale) - lh2) / 2, lw2, lh2)
+      ctx.drawImage(logo, dx + (lg.x * scale) + ((lg.maxW * scale) - lw2) / 2, dy + (lg.y * scale) + ((lg.maxH * scale) - lh2) / 2, lw2, lh2)
     } catch {}
   }
 }

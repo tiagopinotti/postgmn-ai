@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { callAI, extractJSON } from '../lib/ai.js'
 import { generateAIImage } from '../lib/imageGen.js'
 import { supabase } from '../lib/supabase'
-import { TEMPLATES, drawPostImage, BASE_TEMPLATE } from '../lib/imageRenderer.js'
+import { TEMPLATES, drawPostImage, BASE_TEMPLATE, LAYOUTS } from '../lib/imageRenderer.js'
 
 const IconDownload = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 const IconSpark = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/></svg>
@@ -371,10 +371,17 @@ Retorne SOMENTE o JSON: {"image_text": "TEXTO AQUI\\nCOMPLEMENTO AQUI"}`, aiProv
         {hasText && (
           <div style={{ marginTop: 24 }}>
             <div style={{ border: '1px solid var(--gray-200)', borderRadius: 12, overflow: 'hidden', background: 'var(--gray-50)', padding: 12 }}>
-              <div style={{ width: '100%', aspectRatio: '1/1', position: 'relative', overflow: 'hidden', borderRadius: 8, background: '#DDD', marginBottom: 12 }}>
-                {rendering && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', zIndex: 1, fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>Renderizando...</div>}
-                <img ref={previewRef} alt="Preview do criativo" style={{ width: '100%', display: 'block' }} />
-              </div>
+              {(() => {
+                const currentLayout = LAYOUTS[tpl.layout || 'default'] || LAYOUTS.default
+                const aspectRatio = `${currentLayout.canvas.w}/${currentLayout.canvas.h}`
+
+                return (
+                  <div style={{ width: '100%', aspectRatio, position: 'relative', overflow: 'hidden', borderRadius: 8, background: '#DDD', marginBottom: 12 }}>
+                    {rendering && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)', zIndex: 1, fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>Renderizando...</div>}
+                    <img ref={previewRef} alt="Preview do criativo" style={{ width: '100%', display: 'block' }} />
+                  </div>
+                )
+              })()}
 
               {localImage && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16, background: 'white', padding: 12, borderRadius: 8, border: '1px solid var(--gray-100)' }}>

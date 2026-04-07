@@ -214,7 +214,7 @@ export default function ClientForm() {
   }
 
   function openNewTemplate() {
-    setEditingTemplate({ name: '', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFFEE', tags: [], is_default: false, _tagInput: '' })
+    setEditingTemplate({ name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFFEE', tags: [], is_default: false, _tagInput: '' })
   }
 
   async function saveTemplate() {
@@ -262,7 +262,7 @@ export default function ClientForm() {
   // Template thumbnail component
   function TemplateThumbnail({ tpl }) {
     const ref = useRef(null)
-    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color])
+    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout])
     return <canvas ref={ref} style={{ width: '100%', height: 'auto', borderRadius: 6 }} />
   }
 

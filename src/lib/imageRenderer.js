@@ -144,7 +144,7 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
 
   // 2. Text box
   const tb = L.textBox
-  const tbColor = tpl.text_bg_color || '#FFFFFFEE'
+  const tbColor = tpl.text_bg_color || '#FFFFFF'
   ctx.fillStyle = tbColor
   roundRect(ctx, tb.x, tb.y, tb.w, tb.h, 16)
   ctx.fill()
@@ -152,7 +152,8 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
   // 3. Text
   if (text && text.trim()) {
     const padding = 30
-    const { lines, fontSize } = fitText(ctx, text, tb.w - padding * 2, 42)
+    const startFontSize = tpl.font_size || 42
+    const { lines, fontSize } = fitText(ctx, text, tb.w - padding * 2, startFontSize)
     const lineH = fontSize * 1.3
     const totalH = lines.length * lineH
     const startY = tb.y + (tb.h - totalH) / 2 + lineH / 2
@@ -300,7 +301,7 @@ export async function drawTemplateThumbnail(canvas, tpl) {
 
   // Text box placeholder
   const tb = L.textBox
-  ctx.fillStyle = tpl.text_bg_color || '#FFFFFFEE'
+  ctx.fillStyle = tpl.text_bg_color || '#FFFFFF'
   roundRect(ctx, dx + tb.x * scale, dy + tb.y * scale, tb.w * scale, tb.h * scale, 4)
   ctx.fill()
 

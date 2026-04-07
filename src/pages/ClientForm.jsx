@@ -214,7 +214,7 @@ export default function ClientForm() {
   }
 
   function openNewTemplate() {
-    setEditingTemplate({ name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFFEE', tags: [], is_default: false, _tagInput: '' })
+    setEditingTemplate({ name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFF', font_size: 42, tags: [], is_default: false, _tagInput: '' })
   }
 
   async function saveTemplate() {
@@ -232,7 +232,8 @@ export default function ClientForm() {
         tags: editingTemplate.tags || [],
         is_default: editingTemplate.is_default,
         sort_order: editingTemplate.sort_order || templates.length,
-        layout: editingTemplate.layout || 'default'
+        layout: editingTemplate.layout || 'default',
+        font_size: parseInt(editingTemplate.font_size) || 42
       }
       if (editingTemplate.id) {
         await supabase.from('post_templates').update(payload).eq('id', editingTemplate.id)
@@ -595,12 +596,18 @@ export default function ClientForm() {
                               <input className="form-input" value={editingTemplate.name} onChange={e => setEditingTemplate(p => ({ ...p, name: e.target.value }))}
                                 placeholder="Ex: Curso de Inglês, Promoção, Comunicado" />
                             </div>
-                            <div className="form-group">
-                              <label className="form-label">Layout</label>
-                              <select className="form-select" value={editingTemplate.layout || 'default'} onChange={e => setEditingTemplate(p => ({ ...p, layout: e.target.value }))}>
-                                <option value="default">Padrão (Topo)</option>
-                                <option value="left">Texto na Esquerda</option>
-                              </select>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                              <div className="form-group">
+                                <label className="form-label">Layout</label>
+                                <select className="form-select" value={editingTemplate.layout || 'default'} onChange={e => setEditingTemplate(p => ({ ...p, layout: e.target.value }))}>
+                                  <option value="default">Padrão (Topo)</option>
+                                  <option value="left">Texto na Esquerda</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Tam. Fonte: <strong>{editingTemplate.font_size || 42}</strong></label>
+                                <input type="range" min="20" max="100" step="1" value={editingTemplate.font_size || 42} onChange={e => setEditingTemplate(p => ({ ...p, font_size: e.target.value }))} style={{ width: '100%', marginTop: 8 }} />
+                              </div>
                             </div>
                           </div>
 

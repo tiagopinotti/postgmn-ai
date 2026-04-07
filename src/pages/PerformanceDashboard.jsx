@@ -195,6 +195,8 @@ export default function PerformanceDashboard() {
                 <PostImageRender 
                   template={dbTemplates.find(t => t.id === post.image_template)}
                   text={post.image_text}
+                  imageUrl={post.image_url}
+                  settings={post.image_settings}
                   style={{ width: '100%', height: '100%' }}
                 />
               </div>

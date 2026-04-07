@@ -282,18 +282,20 @@ export default function ApprovalPortal() {
                 <div className="card-body">
                   {/* CRIATIVO E TEXTO DO POST */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
-                    {post.image_url ? (
+                    {(post.image_template || post.image_text) ? (
+                      <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
+                        <PostImageRender 
+                          template={dbTemplates.find(t => t.id === post.image_template)} 
+                          templateKey={post.image_template} 
+                          text={post.image_text} 
+                          imageUrl={post.image_url}
+                          settings={post.image_settings}
+                        />
+                      </div>
+                    ) : post.image_url && (
                        <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
                           <img src={post.image_url} alt="Post preview" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--gray-200)', objectFit: 'cover' }} />
                        </div>
-                    ) : post.image_text && (
-                        <div style={{ flex: '1 1 300px', maxWidth: 440 }}>
-                          <PostImageRender 
-                            template={dbTemplates.find(t => t.id === post.image_template)} 
-                            templateKey={post.image_template} 
-                            text={post.image_text} 
-                          />
-                        </div>
                     )}
                     {post.post_text && (
                       <div style={{

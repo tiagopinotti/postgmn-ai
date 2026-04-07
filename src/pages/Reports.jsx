@@ -67,8 +67,9 @@ function DonutChart({ data }) {
 export default function Reports() {
   const { user } = useAuth()
   const now = new Date()
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const [month, setMonth] = useState(prevMonthDate.getMonth() + 1)
+  const [year, setYear] = useState(prevMonthDate.getFullYear())
   const [clients, setClients] = useState([])
   const [selectedClient, setSelectedClient] = useState('all')
   const [report, setReport] = useState(null)
@@ -457,9 +458,17 @@ ${contactName ? `O responsável se chama ${contactName}, use isso na mensagem do
 Retorne EXCLUSIVAMENTE um JSON no seguinte formato:
 {
   "report": "Análise detalhada baseada nos prints. Destaque pontos de sucesso e melhoria.",
-  "zap": "Mensagem para WhatsApp. Comece com 'Olá ${contactName || 'tudo bem'}'."
+  "zap": "Mensagem para WhatsApp. Comece com 'Olá ${contactName || 'tudo bem'}'",
+  "metrics": {
+    "total_interactions": 0,
+    "website_clicks": 0,
+    "call_clicks": 0,
+    "direction_requests": 0,
+    "impressions_search": 0,
+    "impressions_maps": 0
+  }
 }
-Não use markdown headers.`
+No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não encontrar algum, use 0. Não use markdown headers.`
 
     try {
       const geminiKey = localStorage.getItem('API_KEY_GEMINI') || import.meta.env.VITE_GOOGLE_AI_KEY
@@ -526,6 +535,7 @@ Não use markdown headers.`
         setZapMessage(reportData.zap)
         setAiReport(reportData.report)
 
+        // Salvar Relatório de Texto
         await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
@@ -534,7 +544,38 @@ Não use markdown headers.`
           zap_message: reportData.zap,
           user_id: user.id
         }, { onConflict: 'client_id,month,year' })
-        toast.success('Relatório gerado com sucesso!')
+
+        // Salvar Métricas Extraídas (se houver)
+        if (reportData.metrics) {
+          const m = reportData.metrics
+          await supabase.from('gmb_metrics').upsert({
+            client_id: selectedClient,
+            month,
+            year,
+            total_interactions: m.total_interactions || 0,
+            website_clicks: m.website_clicks || 0,
+            call_clicks: m.call_clicks || 0,
+            direction_requests: m.direction_requests || 0,
+            impressions_search: m.impressions_search || 0,
+            impressions_maps: m.impressions_maps || 0,
+            fetched_at: new Date().toISOString()
+          }, { onConflict: 'client_id,month,year' })
+          
+          // Atualizar estado local para refletir imediatamente nos cards
+          setGmbData({
+            total_interactions: m.total_interactions || 0,
+            website_clicks: m.website_clicks || 0,
+            call_clicks: m.call_clicks || 0,
+            direction_requests: m.direction_requests || 0,
+            impressions_search: m.impressions_search || 0,
+            impressions_maps: m.impressions_maps || 0
+          })
+
+          // Recarregar métricas (opcional, para sincronizar com DB)
+          loadGmbMetrics()
+        }
+
+        toast.success('Relatório e métricas salvos com sucesso!')
       } else {
         throw new Error('Nenhuma IA disponível ou erro na análise.')
       }

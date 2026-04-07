@@ -1,9 +1,17 @@
-// Default layout: text box at top, image area below, logo at bottom
-const DEFAULT_LAYOUT = {
-  canvas: { w: 1080, h: 1080 },
-  textBox: { x: 60, y: 60, w: 960, h: 200 },
-  imageArea: { x: 90, y: 290, w: 900, h: 560 },
-  logo: { x: 440, y: 900, maxW: 200, maxH: 120 },
+// Template layouts
+const LAYOUTS = {
+  default: {
+    canvas: { w: 1080, h: 1080 },
+    textBox: { x: 60, y: 60, w: 960, h: 200 },
+    imageArea: { x: 90, y: 290, w: 900, h: 560 },
+    logo: { x: 440, y: 900, maxW: 200, maxH: 120 },
+  },
+  left: {
+    canvas: { w: 1080, h: 1080 },
+    textBox: { x: 100, y: 505, w: 555, h: 210 },
+    logo: { x: 235, y: 745, maxW: 280, maxH: 85 },
+    imageArea: null // Background is the image
+  }
 }
 
 // Legacy hardcoded templates (removed to ensure clean start for new clients)
@@ -113,6 +121,10 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
   canvas.width = W
   canvas.height = H
 
+  // Choose layout
+  const layoutType = tpl.layout || 'default'
+  const L = LAYOUTS[layoutType] || LAYOUTS.default
+
   // 1. Background
   if (tpl.bg_image_url) {
     try {
@@ -121,9 +133,6 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
       const scale = Math.max(W / bgImg.width, H / bgImg.height)
       const sw = bgImg.width * scale, sh = bgImg.height * scale
       ctx.drawImage(bgImg, (W - sw) / 2, (H - sh) / 2, sw, sh)
-      // Semi-transparent overlay for readability
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'
-      ctx.fillRect(0, 0, W, H)
     } catch {
       ctx.fillStyle = tpl.bg_color || '#4F46E5'
       ctx.fillRect(0, 0, W, H)
@@ -134,7 +143,7 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
   }
 
   // 2. Text box
-  const tb = DEFAULT_LAYOUT.textBox
+  const tb = L.textBox
   const tbColor = tpl.text_bg_color || '#FFFFFFEE'
   ctx.fillStyle = tbColor
   roundRect(ctx, tb.x, tb.y, tb.w, tb.h, 16)
@@ -158,50 +167,52 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
     })
   }
 
-  // 4. Image area (with white border)
-  const ia = DEFAULT_LAYOUT.imageArea
-  const borderW = 10
-  // White border
-  ctx.fillStyle = '#FFFFFF'
-  roundRect(ctx, ia.x - borderW, ia.y - borderW, ia.w + borderW * 2, ia.h + borderW * 2, 16)
-  ctx.fill()
+  // 4. Image area
+  const ia = L.imageArea
+  if (ia) {
+    const borderW = 10
+    // White border
+    ctx.fillStyle = '#FFFFFF'
+    roundRect(ctx, ia.x - borderW, ia.y - borderW, ia.w + borderW * 2, ia.h + borderW * 2, 16)
+    ctx.fill()
 
-  // Image placeholder or user image
-  if (userImageSrc) {
-    try {
-      const img = await loadImage(userImageSrc)
-      ctx.save()
-      roundRect(ctx, ia.x, ia.y, ia.w, ia.h, 10)
-      ctx.clip()
-      // Cover crop with adjustable offsets and zoom
-      const baseScale = Math.max(ia.w / img.width, ia.h / img.height)
-      const zoom = imageSettings?.zoom || 1
-      const imgScale = baseScale * zoom
-      
-      const sw = img.width * imgScale
-      const sh = img.height * imgScale
-      
-      // Calculate position: center + user offsets
-      const offsetX = imageSettings?.x || 0
-      const offsetY = imageSettings?.y || 0
-      
-      const dx = ia.x + (ia.w - sw) / 2 + offsetX
-      const dy = ia.y + (ia.h - sh) / 2 + offsetY
-      
-      ctx.drawImage(img, dx, dy, sw, sh)
-      ctx.restore()
-    } catch {
+    // Image placeholder or user image
+    if (userImageSrc) {
+      try {
+        const img = await loadImage(userImageSrc)
+        ctx.save()
+        roundRect(ctx, ia.x, ia.y, ia.w, ia.h, 10)
+        ctx.clip()
+        // Cover crop with adjustable offsets and zoom
+        const baseScale = Math.max(ia.w / img.width, ia.h / img.height)
+        const zoom = imageSettings?.zoom || 1
+        const imgScale = baseScale * zoom
+        
+        const sw = img.width * imgScale
+        const sh = img.height * imgScale
+        
+        // Calculate position: center + user offsets
+        const offsetX = imageSettings?.x || 0
+        const offsetY = imageSettings?.y || 0
+        
+        const dx = ia.x + (ia.w - sw) / 2 + offsetX
+        const dy = ia.y + (ia.h - sh) / 2 + offsetY
+        
+        ctx.drawImage(img, dx, dy, sw, sh)
+        ctx.restore()
+      } catch {
+        drawImagePlaceholder(ctx, ia)
+      }
+    } else {
       drawImagePlaceholder(ctx, ia)
     }
-  } else {
-    drawImagePlaceholder(ctx, ia)
   }
 
   // 5. Logo
   if (tpl.logo_url) {
     try {
       const logo = await loadImage(tpl.logo_url)
-      const lg = DEFAULT_LAYOUT.logo
+      const lg = L.logo
       const logoScale = Math.min(lg.maxW / logo.width, lg.maxH / logo.height, 1)
       const lw = logo.width * logoScale, lh = logo.height * logoScale
       ctx.drawImage(logo, lg.x + (lg.maxW - lw) / 2, lg.y + (lg.maxH - lh) / 2, lw, lh)
@@ -266,14 +277,14 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   canvas.height = H
   const scale = W / 1080
 
+  const L = LAYOUTS[tpl.layout || 'default'] || LAYOUTS.default
+
   // Background
   if (tpl.bg_image_url) {
     try {
       const bgImg = await loadImage(tpl.bg_image_url)
       const s = Math.max(W / bgImg.width, H / bgImg.height)
       ctx.drawImage(bgImg, (W - bgImg.width * s) / 2, (H - bgImg.height * s) / 2, bgImg.width * s, bgImg.height * s)
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'
-      ctx.fillRect(0, 0, W, H)
     } catch {
       ctx.fillStyle = tpl.bg_color || '#4F46E5'
       ctx.fillRect(0, 0, W, H)
@@ -284,7 +295,7 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   }
 
   // Text box placeholder
-  const tb = DEFAULT_LAYOUT.textBox
+  const tb = L.textBox
   ctx.fillStyle = tpl.text_bg_color || '#FFFFFFEE'
   roundRect(ctx, tb.x * scale, tb.y * scale, tb.w * scale, tb.h * scale, 4)
   ctx.fill()
@@ -292,28 +303,30 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   // Text placeholder lines
   ctx.fillStyle = tpl.text_color || '#1a1a1a'
   const lx = (tb.x + 40) * scale, lw = (tb.w - 80) * scale
-  ctx.fillRect(lx, (tb.y + 60) * scale, lw * 0.8, 6 * scale)
-  ctx.fillRect(lx, (tb.y + 100) * scale, lw * 0.5, 6 * scale)
+  ctx.fillRect(lx, (tb.y + tb.h / 2 - 10) * scale, lw * 0.8, 6 * scale)
+  ctx.fillRect(lx, (tb.y + tb.h / 2 + 10) * scale, lw * 0.5, 6 * scale)
 
   // Image area
-  const ia = DEFAULT_LAYOUT.imageArea
-  ctx.fillStyle = '#FFFFFF'
-  roundRect(ctx, (ia.x - 10) * scale, (ia.y - 10) * scale, (ia.w + 20) * scale, (ia.h + 20) * scale, 4)
-  ctx.fill()
-  ctx.fillStyle = '#E5E7EB'
-  roundRect(ctx, ia.x * scale, ia.y * scale, ia.w * scale, ia.h * scale, 3)
-  ctx.fill()
-  ctx.fillStyle = '#9CA3AF'
-  ctx.font = `${8}px Arial`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('📷', (ia.x + ia.w / 2) * scale, (ia.y + ia.h / 2) * scale)
+  const ia = L.imageArea
+  if (ia) {
+    ctx.fillStyle = '#FFFFFF'
+    roundRect(ctx, (ia.x - 10) * scale, (ia.y - 10) * scale, (ia.w + 20) * scale, (ia.h + 20) * scale, 4)
+    ctx.fill()
+    ctx.fillStyle = '#E5E7EB'
+    roundRect(ctx, ia.x * scale, ia.y * scale, ia.w * scale, ia.h * scale, 3)
+    ctx.fill()
+    ctx.fillStyle = '#9CA3AF'
+    ctx.font = `${8}px Arial`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('📷', (ia.x + ia.w / 2) * scale, (ia.y + ia.h / 2) * scale)
+  }
 
   // Logo placeholder
   if (tpl.logo_url) {
     try {
       const logo = await loadImage(tpl.logo_url)
-      const lg = DEFAULT_LAYOUT.logo
+      const lg = L.logo
       const logoScale = Math.min((lg.maxW * scale) / logo.width, (lg.maxH * scale) / logo.height, 1)
       const lw2 = logo.width * logoScale, lh2 = logo.height * logoScale
       ctx.drawImage(logo, (lg.x * scale) + ((lg.maxW * scale) - lw2) / 2, (lg.y * scale) + ((lg.maxH * scale) - lh2) / 2, lw2, lh2)

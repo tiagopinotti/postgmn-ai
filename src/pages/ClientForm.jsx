@@ -232,6 +232,7 @@ export default function ClientForm() {
         tags: editingTemplate.tags || [],
         is_default: editingTemplate.is_default,
         sort_order: editingTemplate.sort_order || templates.length,
+        layout: editingTemplate.layout || 'default'
       }
       if (editingTemplate.id) {
         await supabase.from('post_templates').update(payload).eq('id', editingTemplate.id)
@@ -588,10 +589,19 @@ export default function ClientForm() {
                       <div className="form-grid-2">
                         {/* Left: Form */}
                         <div>
-                          <div className="form-group">
-                            <label className="form-label">Nome do template *</label>
-                            <input className="form-input" value={editingTemplate.name} onChange={e => setEditingTemplate(p => ({ ...p, name: e.target.value }))}
-                              placeholder="Ex: Curso de Inglês, Promoção, Comunicado" />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="form-group">
+                              <label className="form-label">Nome do template *</label>
+                              <input className="form-input" value={editingTemplate.name} onChange={e => setEditingTemplate(p => ({ ...p, name: e.target.value }))}
+                                placeholder="Ex: Curso de Inglês, Promoção, Comunicado" />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Layout</label>
+                              <select className="form-select" value={editingTemplate.layout || 'default'} onChange={e => setEditingTemplate(p => ({ ...p, layout: e.target.value }))}>
+                                <option value="default">Padrão (Topo)</option>
+                                <option value="left">Texto na Esquerda</option>
+                              </select>
+                            </div>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>

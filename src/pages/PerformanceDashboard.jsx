@@ -121,12 +121,12 @@ export default function PerformanceDashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#F9FAFB', paddingBottom: 60 }}>
       {/* Header Premium */}
-      <div style={{ background: primaryColor, color: 'white', padding: '40px 20px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: primaryColor, color: 'white', padding: '60px 20px 80px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.1, background: 'radial-gradient(circle at 20% 50%, white 0%, transparent 50%)' }} />
         
         <div style={{ maxWidth: 1000, margin: '0 auto', position: 'relative' }}>
           {agency?.agency_logo_url ? (
-            <img src={agency.agency_logo_url} alt="Agency Logo" style={{ height: 40, marginBottom: 20, filter: 'brightness(0) invert(1)' }} />
+            <img src={agency.agency_logo_url} alt="Agency Logo" style={{ height: 44, marginBottom: 20, filter: 'brightness(0) invert(1)' }} />
           ) : (
             <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 20 }}>{agency?.agency_name || 'Performance GMN'}</div>
           )}
@@ -140,7 +140,7 @@ export default function PerformanceDashboard() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1000, margin: '-40px auto 0', padding: '0 20px' }}>
+      <div style={{ maxWidth: 1000, margin: '-40px auto 0', padding: '0 20px', position: 'relative', zIndex: 10 }}>
         
         {/* Metric Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '30px' }}>

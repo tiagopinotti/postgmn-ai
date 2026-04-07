@@ -294,16 +294,18 @@ Não use markdown headers.`
         setAiReport(parsed.report)
         setZapMessage(parsed.zap)
 
-        const { error: saveError } = await supabase.from('reports_ai').upsert({
+        const { data: savedData, error: saveError } = await supabase.from('reports_ai').upsert({
           client_id: selectedClient,
           month,
           year,
           report_text: parsed.report,
           zap_message: parsed.zap,
           user_id: user.id
-        }, { onConflict: 'client_id,month,year' })
+        }, { onConflict: 'client_id,month,year' }).select()
 
         if (saveError) throw new Error('Erro ao salvar no banco: ' + saveError.message)
+        if (savedData && savedData[0]) setSavedReportId(savedData[0].id)
+        
         toast.success('Relatório gerado e salvo com sucesso!')
       } else {
         throw new Error('A IA não retornou conteúdo. Verifique sua chave API.')
@@ -803,9 +805,23 @@ No campo metrics, use APENAS NÚMEROS inteiros encontrados nos prints. Se não e
                           <div style={{ background: 'var(--gray-50)', borderRadius: 8, padding: '16px 20px', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', color: 'var(--gray-700)', border: '1px solid var(--gray-200)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--gray-200)', paddingBottom: 8 }}>
                               <span style={{ fontWeight: 600, color: 'var(--gray-900)' }}>Análise Estratégica ✨</span>
-                              <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <IconDownload /> Baixar PDF Profissional
-                              </button>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-primary btn-sm" onClick={() => {
+                                  if (savedReportId) {
+                                    const url = `${window.location.origin}/performance/${savedReportId}`
+                                    navigator.clipboard.writeText(url)
+                                    toast.success('Link do Dashboard copiado!')
+                                    window.open(url, '_blank')
+                                  } else {
+                                    toast.error('Relatório não salvo. Gere novamente.')
+                                  }
+                                }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  📱 Compartilhar Dashboard
+                                </button>
+                                <button className="btn btn-outline btn-sm" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <IconDownload /> PDF
+                                </button>
+                              </div>
                             </div>
                             {aiReport}
                           </div>

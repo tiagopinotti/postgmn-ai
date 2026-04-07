@@ -9,6 +9,7 @@ import PlanEditor from './pages/PlanEditor'
 import Calendar from './pages/Calendar'
 import Notifications from './pages/Notifications'
 import ApprovalPortal from './pages/ApprovalPortal'
+import PerformanceDashboard from './pages/PerformanceDashboard'
 import ClientOnboarding from './pages/ClientOnboarding'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
@@ -48,11 +49,16 @@ function AppRoutes() {
   if (loading) return <div className="loading"><div className="spinner" /><span>Carregando...</span></div>
 
   // Rotas públicas (sem login)
-  if (window.location.pathname.startsWith('/aprovar/') || window.location.pathname.startsWith('/onboarding/')) {
+  if (
+    window.location.pathname.startsWith('/aprovar/') || 
+    window.location.pathname.startsWith('/onboarding/') ||
+    window.location.pathname.startsWith('/performance/')
+  ) {
     return (
       <Routes>
         <Route path="/aprovar/:token" element={<ApprovalPortal />} />
         <Route path="/onboarding/:userId" element={<ClientOnboarding />} />
+        <Route path="/performance/:id" element={<PerformanceDashboard />} />
       </Routes>
     )
   }

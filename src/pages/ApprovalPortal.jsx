@@ -247,7 +247,13 @@ export default function ApprovalPortal() {
           </div>
         )}
 
-        <ApprovalCalendar year={plan?.year} month={plan?.month} posts={posts} onPostClick={handleScrollToPost} />
+        <ApprovalCalendar 
+          year={plan?.year} 
+          month={plan?.month} 
+          posts={posts} 
+          dbTemplates={dbTemplates}
+          onPostClick={handleScrollToPost} 
+        />
 
         {/* LISTA DE POSTS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

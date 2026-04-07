@@ -15,7 +15,7 @@ const CATEGORY_COLORS = {
   'default': '#6366F1'
 }
 
-export default function ApprovalCalendar({ year, month, posts, onPostClick }) {
+export default function ApprovalCalendar({ year, month, posts, onPostClick, dbTemplates = [] }) {
   const [hoverDate, setHoverDate] = useState(null)
   
   if (!year || !month) return null
@@ -96,7 +96,11 @@ export default function ApprovalCalendar({ year, month, posts, onPostClick }) {
                           </div>
                         ) : p.image_text ? (
                           <div style={{ marginBottom: 10 }}>
-                             <PostImageRender templateKey={p.image_template} text={p.image_text} />
+                             <PostImageRender 
+                                template={dbTemplates.find(t => t.id === p.image_template)}
+                                templateKey={p.image_template} 
+                                text={p.image_text} 
+                             />
                           </div>
                         ) : null}
                         <div style={{ fontSize: 12, color: 'var(--gray-600)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>

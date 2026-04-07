@@ -214,7 +214,11 @@ export default function ClientForm() {
   }
 
   function openNewTemplate() {
-    setEditingTemplate({ name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFF', font_size: 42, tags: [], is_default: false, _tagInput: '' })
+    setEditingTemplate({ 
+      name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFF', 
+      font_size: 42, text_box_x: null, text_box_y: null,
+      tags: [], is_default: false, _tagInput: '' 
+    })
   }
 
   async function saveTemplate() {
@@ -233,7 +237,9 @@ export default function ClientForm() {
         is_default: editingTemplate.is_default,
         sort_order: editingTemplate.sort_order || templates.length,
         layout: editingTemplate.layout || 'default',
-        font_size: parseInt(editingTemplate.font_size) || 42
+        font_size: parseInt(editingTemplate.font_size) || 42,
+        text_box_x: editingTemplate.text_box_x === null ? null : parseInt(editingTemplate.text_box_x),
+        text_box_y: editingTemplate.text_box_y === null ? null : parseInt(editingTemplate.text_box_y)
       }
       if (editingTemplate.id) {
         await supabase.from('post_templates').update(payload).eq('id', editingTemplate.id)
@@ -263,7 +269,7 @@ export default function ClientForm() {
   // Template thumbnail component
   function TemplateThumbnail({ tpl }) {
     const ref = useRef(null)
-    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout, tpl.font_size])
+    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout, tpl.font_size, tpl.text_box_x, tpl.text_box_y])
     return <canvas ref={ref} style={{ width: '100%', height: 'auto', borderRadius: 6 }} />
   }
 
@@ -608,6 +614,17 @@ export default function ClientForm() {
                                 <label className="form-label">Tam. Fonte: <strong>{editingTemplate.font_size || 42}</strong></label>
                                 <input type="range" min="20" max="100" step="1" value={editingTemplate.font_size || 42} onChange={e => setEditingTemplate(p => ({ ...p, font_size: e.target.value }))} style={{ width: '100%', marginTop: 8 }} />
                               </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4" style={{ marginBottom: 16 }}>
+                            <div className="form-group">
+                              <label className="form-label">Posição Horizontal (X): <strong>{editingTemplate.text_box_x ?? 'Auto'}</strong></label>
+                              <input type="range" min="0" max="1000" step="5" value={editingTemplate.text_box_x ?? LAYOUTS[editingTemplate.layout || 'default'].textBox.x} onChange={e => setEditingTemplate(p => ({ ...p, text_box_x: parseInt(e.target.value) }))} style={{ width: '100%' }} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Posição Vertical (Y): <strong>{editingTemplate.text_box_y ?? 'Auto'}</strong></label>
+                              <input type="range" min="0" max="1000" step="5" value={editingTemplate.text_box_y ?? LAYOUTS[editingTemplate.layout || 'default'].textBox.y} onChange={e => setEditingTemplate(p => ({ ...p, text_box_y: parseInt(e.target.value) }))} style={{ width: '100%' }} />
                             </div>
                           </div>
 

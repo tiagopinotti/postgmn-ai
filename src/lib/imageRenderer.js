@@ -143,7 +143,11 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
   }
 
   // 2. Text box
-  const tb = L.textBox
+  const tb = { 
+    ...L.textBox,
+    x: tpl.text_box_x !== undefined && tpl.text_box_x !== null ? tpl.text_box_x : L.textBox.x,
+    y: tpl.text_box_y !== undefined && tpl.text_box_y !== null ? tpl.text_box_y : L.textBox.y
+  }
   const tbColor = tpl.text_bg_color || '#FFFFFF'
   ctx.fillStyle = tbColor
   roundRect(ctx, tb.x, tb.y, tb.w, tb.h, 16)
@@ -301,16 +305,28 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   }
 
   // Text box placeholder
-  const tb = L.textBox
+  const tb = { 
+    ...L.textBox,
+    x: tpl.text_box_x !== undefined && tpl.text_box_x !== null ? tpl.text_box_x : L.textBox.x,
+    y: tpl.text_box_y !== undefined && tpl.text_box_y !== null ? tpl.text_box_y : L.textBox.y
+  }
   ctx.fillStyle = tpl.text_bg_color || '#FFFFFF'
   roundRect(ctx, dx + tb.x * scale, dy + tb.y * scale, tb.w * scale, tb.h * scale, 4)
   ctx.fill()
 
-  // Text placeholder lines
+  // Lorem Ipsum Text Preview
+  const fontSize = (tpl.font_size || 42) * scale
   ctx.fillStyle = tpl.text_color || '#1a1a1a'
-  const lx = (tb.x + 40) * scale, lw = (tb.w - 80) * scale
-  ctx.fillRect(lx, (tb.y + tb.h / 2 - 10) * scale, lw * 0.8, 6 * scale)
-  ctx.fillRect(lx, (tb.y + tb.h / 2 + 10) * scale, lw * 0.5, 6 * scale)
+  ctx.font = `bold ${fontSize}px "Inter", "Arial", sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const previewLines = ["Título do Post", "Exemplo de Texto"]
+  const lineH = fontSize * 1.2
+  const startY = (dy + tb.y * scale) + (tb.h * scale / 2) - (lineH * (previewLines.length - 1) / 2)
+  
+  previewLines.forEach((line, i) => {
+    ctx.fillText(line, dx + (tb.x + tb.w / 2) * scale, startY + i * lineH)
+  })
 
   // Image area
   const ia = L.imageArea

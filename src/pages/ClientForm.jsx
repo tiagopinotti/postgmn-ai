@@ -263,7 +263,7 @@ export default function ClientForm() {
   // Template thumbnail component
   function TemplateThumbnail({ tpl }) {
     const ref = useRef(null)
-    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout])
+    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout, tpl.font_size])
     return <canvas ref={ref} style={{ width: '100%', height: 'auto', borderRadius: 6 }} />
   }
 

@@ -275,14 +275,15 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   const L = LAYOUTS[tpl.layout || 'default'] || LAYOUTS.default
 
   const ctx = canvas.getContext('2d')
-  const W = 270, H = 270
+  const W = 400
+  const H = Math.round(W * (L.canvas.h / L.canvas.w))
   canvas.width = W
   canvas.height = H
 
-  // Calculate scale and centering to fit L.canvas into 270x270 thumbnail
-  const scale = Math.min(W / L.canvas.w, H / L.canvas.h)
-  const dx = (W - L.canvas.w * scale) / 2
-  const dy = (H - L.canvas.h * scale) / 2
+  // Calculate scale and centering to fit L.canvas into thumbnail
+  const scale = W / L.canvas.w
+  const dx = 0
+  const dy = 0
 
   // Background
   if (tpl.bg_image_url) {

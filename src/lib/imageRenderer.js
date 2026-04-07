@@ -155,7 +155,7 @@ export async function drawPostImage(canvas, tpl, text, userImageSrc, imageSettin
 
   // 3. Text
   if (text && text.trim()) {
-    const padding = 30
+    const padding = tpl.text_padding || 30
     const startFontSize = tpl.font_size || 42
     const { lines, fontSize } = fitText(ctx, text, tb.w - padding * 2, startFontSize)
     const lineH = fontSize * 1.3
@@ -315,12 +315,14 @@ export async function drawTemplateThumbnail(canvas, tpl) {
   ctx.fill()
 
   // Lorem Ipsum Text Preview
+  const padding = (tpl.text_padding || 30) * scale
   const fontSize = (tpl.font_size || 42) * scale
   ctx.fillStyle = tpl.text_color || '#1a1a1a'
   ctx.font = `bold ${fontSize}px "Inter", "Arial", sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const previewLines = ["Título do Post", "Exemplo de Texto"]
+  const maxWidth = (tb.w * scale) - padding * 2
   const lineH = fontSize * 1.2
   const startY = (dy + tb.y * scale) + (tb.h * scale / 2) - (lineH * (previewLines.length - 1) / 2)
   

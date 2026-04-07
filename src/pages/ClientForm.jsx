@@ -216,7 +216,7 @@ export default function ClientForm() {
   function openNewTemplate() {
     setEditingTemplate({ 
       name: '', layout: 'default', bg_color: '#4F46E5', text_color: '#1a1a1a', text_bg_color: '#FFFFFF', 
-      font_size: 42, text_box_x: null, text_box_y: null,
+      font_size: 42, text_padding: 30, text_box_x: null, text_box_y: null,
       tags: [], is_default: false, _tagInput: '' 
     })
   }
@@ -238,6 +238,7 @@ export default function ClientForm() {
         sort_order: editingTemplate.sort_order || templates.length,
         layout: editingTemplate.layout || 'default',
         font_size: parseInt(editingTemplate.font_size) || 42,
+        text_padding: parseInt(editingTemplate.text_padding) || 30,
         text_box_x: editingTemplate.text_box_x === null ? null : parseInt(editingTemplate.text_box_x),
         text_box_y: editingTemplate.text_box_y === null ? null : parseInt(editingTemplate.text_box_y)
       }
@@ -269,7 +270,7 @@ export default function ClientForm() {
   // Template thumbnail component
   function TemplateThumbnail({ tpl }) {
     const ref = useRef(null)
-    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout, tpl.font_size, tpl.text_box_x, tpl.text_box_y])
+    useEffect(() => { if (ref.current) drawTemplateThumbnail(ref.current, tpl) }, [tpl.bg_color, tpl.bg_image_url, tpl.logo_url, tpl.text_bg_color, tpl.text_color, tpl.layout, tpl.font_size, tpl.text_padding, tpl.text_box_x, tpl.text_box_y])
     return <canvas ref={ref} style={{ width: '100%', height: 'auto', borderRadius: 6 }} />
   }
 
@@ -625,6 +626,10 @@ export default function ClientForm() {
                             <div className="form-group">
                               <label className="form-label">Posição Vertical (Y): <strong>{editingTemplate.text_box_y ?? 'Auto'}</strong></label>
                               <input type="range" min="0" max="1000" step="5" value={editingTemplate.text_box_y ?? LAYOUTS[editingTemplate.layout || 'default'].textBox.y} onChange={e => setEditingTemplate(p => ({ ...p, text_box_y: parseInt(e.target.value) }))} style={{ width: '100%' }} />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                              <label className="form-label">Padding (Espaçamento Interno): <strong>{editingTemplate.text_padding || 30}px</strong></label>
+                              <input type="range" min="0" max="150" step="2" value={editingTemplate.text_padding || 30} onChange={e => setEditingTemplate(p => ({ ...p, text_padding: parseInt(e.target.value) }))} style={{ width: '100%' }} />
                             </div>
                           </div>
 

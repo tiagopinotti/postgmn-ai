@@ -23,7 +23,7 @@ export default function Dashboard() {
         supabase.from('content_plans').select('*', { count: 'exact', head: true }),
         supabase.from('posts').select('*', { count: 'exact', head: true }),
         supabase.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-        supabase.from('clients').select('id, company_name, niche, city, is_active').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
+        supabase.from('clients').select('id, company_name, niche, city, is_active').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10)
       ])
       setStats({ clients: clients || 0, plans: plans || 0, posts: posts || 0, pending: pending || 0 })
       setRecentClients(recent || [])

@@ -10,6 +10,7 @@ import Calendar from './pages/Calendar'
 import Notifications from './pages/Notifications'
 import ApprovalPortal from './pages/ApprovalPortal'
 import Reports from './pages/Reports'
+import ReportView from './pages/ReportView'
 import Settings from './pages/Settings'
 import Layout from './components/Layout'
 
@@ -20,6 +21,11 @@ function AppRoutes() {
   // Portal de aprovação — público, sem login
   if (window.location.pathname.startsWith('/aprovar/')) {
     return <Routes><Route path="/aprovar/:token" element={<ApprovalPortal />} /></Routes>
+  }
+
+  // Relatório público — sem login
+  if (window.location.pathname.startsWith('/relatorio/')) {
+    return <Routes><Route path="/relatorio/:token" element={<ReportView />} /></Routes>
   }
 
   if (!user) return <Routes><Route path="*" element={<Login />} /></Routes>

@@ -46,7 +46,7 @@ ${form.descriptionText}
 - Entrada com acessibilidade: ${form.hasAccessibility}
 - Banheiro p/ cadeira de rodas: ${form.hasWheelchairRestroom}`
 
-    const { error: err } = await supabase.from('clients').insert({
+    const { data: newClient, error: err } = await supabase.from('clients').insert({
       user_id: userId,
       company_name: form.companyName,
       niche: form.niche,
@@ -64,12 +64,20 @@ ${form.descriptionText}
       has_restroom: form.hasRestroom,
       has_accessibility: form.hasAccessibility,
       has_wheelchair_restroom: form.hasWheelchairRestroom
-    })
+    }).select('id, company_name').single()
 
     if (err) {
       setError('Ocorreu um erro ao enviar seus dados. Tente novamente ou contate sua agência.')
       console.error(err)
     } else {
+      // Notify the agency
+      await supabase.from('notifications').insert({
+        client_id: newClient.id,
+        type: 'system',
+        title: 'Novo cliente cadastrado',
+        message: `A empresa ${newClient.company_name} acabou de preencher o formulário de onboarding.`,
+        link: `/clientes/${newClient.id}/editar`
+      })
       setSuccess(true)
     }
     setLoading(false)

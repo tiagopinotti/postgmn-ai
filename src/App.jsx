@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -9,6 +9,8 @@ import PlanEditor from './pages/PlanEditor'
 import Calendar from './pages/Calendar'
 import Notifications from './pages/Notifications'
 import ApprovalPortal from './pages/ApprovalPortal'
+import ClientOnboarding from './pages/ClientOnboarding'
+import PerformanceDashboard from './pages/PerformanceDashboard'
 import Reports from './pages/Reports'
 import ReportView from './pages/ReportView'
 import Settings from './pages/Settings'
@@ -16,12 +18,20 @@ import Layout from './components/Layout'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
-  if (loading) return <div className="loading"><div className="spinner" /><span>Carregando...</span></div>
+  const location = useLocation()
 
-  // Portal de aprovação — público, sem login
-  if (window.location.pathname.startsWith('/aprovar/')) {
+  // Rotas verdadeiramente públicas — sem verificação de login
+  if (location.pathname.startsWith('/aprovar/')) {
     return <Routes><Route path="/aprovar/:token" element={<ApprovalPortal />} /></Routes>
   }
+  if (location.pathname.startsWith('/onboarding/')) {
+    return <Routes><Route path="/onboarding/:userId" element={<ClientOnboarding />} /></Routes>
+  }
+  if (location.pathname.startsWith('/dashboard/')) {
+    return <Routes><Route path="/dashboard/:id" element={<PerformanceDashboard />} /></Routes>
+  }
+
+  if (loading) return <div className="loading"><div className="spinner" /><span>Carregando...</span></div>
 
   // Relatório público — sem login
   if (window.location.pathname.startsWith('/relatorio/')) {
